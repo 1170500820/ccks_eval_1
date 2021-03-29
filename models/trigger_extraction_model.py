@@ -84,7 +84,7 @@ class TriggerExtractionModel(nn.Module):
         # print('cln',  cln_embeds.size())
         # print('att', attn_out.size())
         # print('syn', syntactic_structure.size())
-        final_repr = torch.cat((cln_embeds, attn_out, syntactic_structure), dim=-1) # got (bsz, seq_l, hidden * 2 + syn)
+        final_repr = torch.cat((cln_embeds, attn_out, syntactic_structure.cuda()), dim=-1) # got (bsz, seq_l, hidden * 2 + syn)
         # linear
         #   got both (bsz, seq_l, 1), convert to (bsz, seq_l)
         start_logits, end_logits = self.fcn_start(final_repr).squeeze(), self.fcn_end(final_repr).squeeze()

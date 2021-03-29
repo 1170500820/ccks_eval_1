@@ -98,8 +98,8 @@ def train_trigger_extraction(repr_lr=2e-5, tem_lr = 1e-4, epoch=20, epoch_save_c
     optimizer_tem = AdamW(tem.parameters(), lr=tem_lr)
 
     # training device
-    # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    device = torch.device('cpu')
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    # device = torch.device('cpu')
     repr_model.to(device)
     tem.to(device)
 
@@ -114,7 +114,7 @@ def train_trigger_extraction(repr_lr=2e-5, tem_lr = 1e-4, epoch=20, epoch_save_c
         repr_model.train()
         tem.train()
         epoch_total_loss = 0.0
-        for i_batch, batch_ in enumerate(train_sentences_batch[:1]):
+        for i_batch, batch_ in enumerate(train_sentences_batch):
             # forward
             typ_batch = train_types_batch[i_batch]
             gt_batch = train_gts_batch[i_batch]
@@ -125,7 +125,7 @@ def train_trigger_extraction(repr_lr=2e-5, tem_lr = 1e-4, epoch=20, epoch_save_c
             start_logits, end_logits = tem(h_styp, syn_batch)
 
             # compute loss and backward
-            loss = F.binary_cross_entropy(start_logits, gt_batch[0]) + F.binary_cross_entropy(end_logits, gt_batch[1])
+            loss = F.binary_cross_entropy(start_logits, gt_batch[0].cuda()) + F.binary_cross_entropy(end_logits, gt_batch[1].cuda())
             loss.backward()
             optimizer_repr_plm.step()
             optimizer_repr_cln.step()

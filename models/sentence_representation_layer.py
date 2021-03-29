@@ -26,8 +26,8 @@ class SentenceRepresentation(nn.Module):
             sentence_type = [sentence_type]
         # contextualized representation
         output = self.concatenation(sentence, sentence_type)
-        input_ids, token_type_ids, attention_mask = output['input_ids'], output['token_type_ids'], \
-                                                    output['attention_mask']
+        input_ids, token_type_ids, attention_mask = output['input_ids'].cuda(), output['token_type_ids'].cuda(), \
+                                                    output['attention_mask'].cuda()
         output = self.PLM(input_ids=input_ids, token_type_ids=token_type_ids, attention_mask=attention_mask)
         #   output is of size (bsz, seq_l, hidden)
         # take H_s and H_c
@@ -44,7 +44,7 @@ class SentenceRepresentation(nn.Module):
             seq_ls.append(H_ss[-1].size(0))
         max_seq_l = max(seq_ls)
         for i in range(len(H_ss)):
-            H_ss[i] = torch.cat([H_ss[i], torch.zeros(max_seq_l - H_ss[i].size()[0], H_ss[i].size()[1])])  # todo
+            H_ss[i] = torch.cat([H_ss[i], torch.zeros(max_seq_l - H_ss[i].size()[0], H_ss[i].size()[1]).cuda()])  # todo
         #   H_c and H_s be of size (type_l/seq_l, hidden)
         #   seq_l各有不同，所以需要补0 todo 会影响效果吗
         # MeanPooling on H_c
