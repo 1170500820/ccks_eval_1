@@ -8,11 +8,11 @@ from settings import *
 
 
 class SentenceRepresentation(nn.Module):
-    def __init__(self, PLM_path, hidden_size):
+    def __init__(self, PLM_path, hidden_size, pass_cln=False):
         super(SentenceRepresentation, self).__init__()
         self.concatenation = SentenceTypeConcatenation(PLM_path)
         self.PLM = BertModel.from_pretrained(PLM_path)
-        self.CLN = ConditionalLayerNormalization(hidden_size)
+        self.CLN = ConditionalLayerNormalization(hidden_size, pass_layer_norm=pass_cln)
 
     def forward(self, sentence, sentence_type):
         """

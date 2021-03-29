@@ -4,7 +4,17 @@ import torch.nn.functional as F
 
 
 class TriggerExtractionModel(nn.Module):
-    def __init__(self, num_heads, hidden_size, d_head, dropout_prob, syntactic_size):
+    def __init__(self, num_heads, hidden_size, d_head, dropout_prob, syntactic_size, pass_attn=False, pass_syn=False):
+        """
+
+        :param num_heads:
+        :param hidden_size:
+        :param d_head:
+        :param dropout_prob:
+        :param syntactic_size:
+        :param pass_attn: if True, pass the self attention procedure, return the original cln embeds
+        :param pass_syn: if True, remove the syntactic feature, must be synchronized with settings.py
+        """
         super(TriggerExtractionModel, self).__init__()
         self.num_heads = num_heads
         self.hidden_size = hidden_size
@@ -42,13 +52,11 @@ class TriggerExtractionModel(nn.Module):
         torch.nn.init.xavier_uniform(self.o_net.weight)
         pass
 
-    def forward(self, cln_embeds, syntactic_structure, pass_attn=False, pass_syn=False):
+    def forward(self, cln_embeds, syntactic_structure):
         """
 
         :param cln_embeds: (bsz, seq_l, hidden_size)， 经过CLN处理的句子embeddings
         :param syntactic_structure: (bsz, seq_l, syntactic_size)， 将会拼接到embeds上
-        :param pass_attn: if True, pass the self attention procedure, return the original cln embeds
-        :param pass_syn: if True, remove the syntactic feature, must be synchronized with settings.py
         :return:
         """
         # self attention (multihead attention)

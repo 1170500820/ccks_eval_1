@@ -91,7 +91,7 @@ def train_trigger_extraction(repr_lr=2e-5, tem_lr = 1e-4, epoch=20, epoch_save_c
     config = BertConfig.from_pretrained(model_path)
 
     # define models and optimizers
-    repr_model = SentenceRepresentation(model_path, config.hidden_size)
+    repr_model = SentenceRepresentation(model_path, config.hidden_size, pass_cln=True)
     tem = TriggerExtractionModel(n_head, config.hidden_size, d_head, config.hidden_dropout_prob, ltp_feature_cnt_fixed)
     optimizer_repr_plm = AdamW(repr_model.PLM.parameters(), lr=repr_lr)
     optimizer_repr_cln = AdamW(repr_model.CLN.parameters(), lr=tem_lr)
