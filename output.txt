@@ -1,0 +1,267 @@
+(myconda) root@459fbea441a1:/# cd mnt/extraction_eval_1/train
+(myconda) root@459fbea441a1:/mnt/extraction_eval_1/train# python event_detection_training.py train_trigger_extraction
+2021-03-24 00:07:03.102232: I tensorflow/stream_executor/platform/default/dso_loader.cc:48] Successfully opened dynamic library libcudart.so.10.1
+../models/trigger_extraction_model.py:36: UserWarning: nn.init.xavier_uniform is now deprecated in favor of nn.init.xavier_uniform_.
+  torch.nn.init.xavier_uniform(self.fcn_start.weight)
+../models/trigger_extraction_model.py:37: UserWarning: nn.init.xavier_uniform is now deprecated in favor of nn.init.xavier_uniform_.
+  torch.nn.init.xavier_uniform(self.fcn_end.weight)
+../models/trigger_extraction_model.py:40: UserWarning: nn.init.xavier_uniform is now deprecated in favor of nn.init.xavier_uniform_.
+  torch.nn.init.xavier_uniform(self.q_net.weight)
+../models/trigger_extraction_model.py:41: UserWarning: nn.init.xavier_uniform is now deprecated in favor of nn.init.xavier_uniform_.
+  torch.nn.init.xavier_uniform(self.kv_net.weight)
+../models/trigger_extraction_model.py:42: UserWarning: nn.init.xavier_uniform is now deprecated in favor of nn.init.xavier_uniform_.
+  torch.nn.init.xavier_uniform(self.o_net.weight)
+Traceback (most recent call last):
+  File "event_detection_training.py", line 130, in <module>
+    fire.Fire()
+  File "/root/miniconda3/envs/myconda/lib/python3.7/site-packages/fire/core.py", line 138, in Fire
+    component_trace = _Fire(component, args, parsed_flag_args, context, name)
+  File "/root/miniconda3/envs/myconda/lib/python3.7/site-packages/fire/core.py", line 468, in _Fire
+    target=component.__name__)
+  File "/root/miniconda3/envs/myconda/lib/python3.7/site-packages/fire/core.py", line 672, in _CallAndUpdateTrace
+    component = fn(*varargs, **kwargs)
+  File "event_detection_training.py", line 116, in train_trigger_extraction
+    h_styp = repr_model(batch_, typ_batch)
+  File "/root/miniconda3/envs/myconda/lib/python3.7/site-packages/torch/nn/modules/module.py", line 541, in __call__
+    result = self.forward(*input, **kwargs)
+  File "../models/sentence_representation_layer.py", line 52, in forward
+    H_styp = self.CLN(torch.stack(H_ss), torch.stack(H_cs))
+RuntimeError: invalid argument 0: Sizes of tensors must match except in dimension 0. Got 389 and 326 in dimension 1 at /pytorch/aten/src/THC/generic/THCTensorMath.cu:71
+(myconda) root@459fbea441a1:/mnt/extraction_eval_1/train# vim ../models/sentence_representation_layer.py 
+(myconda) root@459fbea441a1:/mnt/extraction_eval_1/train# python event_detection_training.py train_trigger_extraction
+2021-03-24 00:11:39.877779: I tensorflow/stream_executor/platform/default/dso_loader.cc:48] Successfully opened dynamic library libcudart.so.10.1
+../models/trigger_extraction_model.py:36: UserWarning: nn.init.xavier_uniform is now deprecated in favor of nn.init.xavier_uniform_.
+  torch.nn.init.xavier_uniform(self.fcn_start.weight)
+../models/trigger_extraction_model.py:37: UserWarning: nn.init.xavier_uniform is now deprecated in favor of nn.init.xavier_uniform_.
+  torch.nn.init.xavier_uniform(self.fcn_end.weight)
+../models/trigger_extraction_model.py:40: UserWarning: nn.init.xavier_uniform is now deprecated in favor of nn.init.xavier_uniform_.
+  torch.nn.init.xavier_uniform(self.q_net.weight)
+../models/trigger_extraction_model.py:41: UserWarning: nn.init.xavier_uniform is now deprecated in favor of nn.init.xavier_uniform_.
+  torch.nn.init.xavier_uniform(self.kv_net.weight)
+../models/trigger_extraction_model.py:42: UserWarning: nn.init.xavier_uniform is now deprecated in favor of nn.init.xavier_uniform_.
+  torch.nn.init.xavier_uniform(self.o_net.weight)
+max 389 [326, 0, 362, 385, 278, 389, 299, 389]
+Traceback (most recent call last):
+  File "event_detection_training.py", line 130, in <module>
+    fire.Fire()
+  File "/root/miniconda3/envs/myconda/lib/python3.7/site-packages/fire/core.py", line 138, in Fire
+    component_trace = _Fire(component, args, parsed_flag_args, context, name)
+  File "/root/miniconda3/envs/myconda/lib/python3.7/site-packages/fire/core.py", line 468, in _Fire
+    target=component.__name__)
+  File "/root/miniconda3/envs/myconda/lib/python3.7/site-packages/fire/core.py", line 672, in _CallAndUpdateTrace
+    component = fn(*varargs, **kwargs)
+  File "event_detection_training.py", line 116, in train_trigger_extraction
+    h_styp = repr_model(batch_, typ_batch)
+  File "/root/miniconda3/envs/myconda/lib/python3.7/site-packages/torch/nn/modules/module.py", line 541, in __call__
+    result = self.forward(*input, **kwargs)
+  File "../models/sentence_representation_layer.py", line 48, in forward
+    H_ss[i] = torch.stack(H_ss[i], torch.zeros(max_seq_l - H_ss[i].size(0), H_ss[i].size(1)))
+TypeError: stack(): argument 'tensors' (position 1) must be tuple of Tensors, not Tensor
+(myconda) root@459fbea441a1:/mnt/extraction_eval_1/train# vim ../models/sentence_representation_layer.py 
+(myconda) root@459fbea441a1:/mnt/extraction_eval_1/train# vim ../models/sentence_representation_layer.py 
+(myconda) root@459fbea441a1:/mnt/extraction_eval_1/train# python event_detection_training.py train_trigger_extraction
+2021-03-24 00:14:05.951519: I tensorflow/stream_executor/platform/default/dso_loader.cc:48] Successfully opened dynamic library libcudart.so.10.1
+../models/trigger_extraction_model.py:36: UserWarning: nn.init.xavier_uniform is now deprecated in favor of nn.init.xavier_uniform_.
+  torch.nn.init.xavier_uniform(self.fcn_start.weight)
+../models/trigger_extraction_model.py:37: UserWarning: nn.init.xavier_uniform is now deprecated in favor of nn.init.xavier_uniform_.
+  torch.nn.init.xavier_uniform(self.fcn_end.weight)
+../models/trigger_extraction_model.py:40: UserWarning: nn.init.xavier_uniform is now deprecated in favor of nn.init.xavier_uniform_.
+  torch.nn.init.xavier_uniform(self.q_net.weight)
+../models/trigger_extraction_model.py:41: UserWarning: nn.init.xavier_uniform is now deprecated in favor of nn.init.xavier_uniform_.
+  torch.nn.init.xavier_uniform(self.kv_net.weight)
+../models/trigger_extraction_model.py:42: UserWarning: nn.init.xavier_uniform is now deprecated in favor of nn.init.xavier_uniform_.
+  torch.nn.init.xavier_uniform(self.o_net.weight)
+max 389 [326, 0, 362, 385, 278, 389, 299, 389]
+Traceback (most recent call last):
+  File "event_detection_training.py", line 130, in <module>
+    fire.Fire()
+  File "/root/miniconda3/envs/myconda/lib/python3.7/site-packages/fire/core.py", line 138, in Fire
+    component_trace = _Fire(component, args, parsed_flag_args, context, name)
+  File "/root/miniconda3/envs/myconda/lib/python3.7/site-packages/fire/core.py", line 468, in _Fire
+    target=component.__name__)
+  File "/root/miniconda3/envs/myconda/lib/python3.7/site-packages/fire/core.py", line 672, in _CallAndUpdateTrace
+    component = fn(*varargs, **kwargs)
+  File "event_detection_training.py", line 116, in train_trigger_extraction
+    h_styp = repr_model(batch_, typ_batch)
+  File "/root/miniconda3/envs/myconda/lib/python3.7/site-packages/torch/nn/modules/module.py", line 541, in __call__
+    result = self.forward(*input, **kwargs)
+  File "../models/sentence_representation_layer.py", line 48, in forward
+    H_ss[i] = torch.cat([H_ss[i], torch.zeros(max_seq_l - H_ss[i].size(0), H_ss[i].size(1))])
+RuntimeError: Expected object of backend CUDA but got backend CPU for sequence element 1 in sequence argument at position #1 'tensors'
+(myconda) root@459fbea441a1:/mnt/extraction_eval_1/train# vim ../models/sentence_representation_layer.py 
+(myconda) root@459fbea441a1:/mnt/extraction_eval_1/train# python event_detection_training.py train_trigger_extraction
+2021-03-24 00:15:09.586862: I tensorflow/stream_executor/platform/default/dso_loader.cc:48] Successfully opened dynamic library libcudart.so.10.1
+../models/trigger_extraction_model.py:36: UserWarning: nn.init.xavier_uniform is now deprecated in favor of nn.init.xavier_uniform_.
+  torch.nn.init.xavier_uniform(self.fcn_start.weight)
+../models/trigger_extraction_model.py:37: UserWarning: nn.init.xavier_uniform is now deprecated in favor of nn.init.xavier_uniform_.
+  torch.nn.init.xavier_uniform(self.fcn_end.weight)
+../models/trigger_extraction_model.py:40: UserWarning: nn.init.xavier_uniform is now deprecated in favor of nn.init.xavier_uniform_.
+  torch.nn.init.xavier_uniform(self.q_net.weight)
+../models/trigger_extraction_model.py:41: UserWarning: nn.init.xavier_uniform is now deprecated in favor of nn.init.xavier_uniform_.
+  torch.nn.init.xavier_uniform(self.kv_net.weight)
+../models/trigger_extraction_model.py:42: UserWarning: nn.init.xavier_uniform is now deprecated in favor of nn.init.xavier_uniform_.
+  torch.nn.init.xavier_uniform(self.o_net.weight)
+max 389 [326, 0, 362, 385, 278, 389, 299, 389]
+torch.Size([389, 768])
+torch.Size([389, 768])
+torch.Size([389, 768])
+Traceback (most recent call last):
+  File "event_detection_training.py", line 130, in <module>
+    fire.Fire()
+  File "/root/miniconda3/envs/myconda/lib/python3.7/site-packages/fire/core.py", line 138, in Fire
+    component_trace = _Fire(component, args, parsed_flag_args, context, name)
+  File "/root/miniconda3/envs/myconda/lib/python3.7/site-packages/fire/core.py", line 468, in _Fire
+    target=component.__name__)
+  File "/root/miniconda3/envs/myconda/lib/python3.7/site-packages/fire/core.py", line 672, in _CallAndUpdateTrace
+    component = fn(*varargs, **kwargs)
+  File "event_detection_training.py", line 116, in train_trigger_extraction
+    h_styp = repr_model(batch_, typ_batch)
+  File "/root/miniconda3/envs/myconda/lib/python3.7/site-packages/torch/nn/modules/module.py", line 541, in __call__
+    result = self.forward(*input, **kwargs)
+  File "../models/sentence_representation_layer.py", line 56, in forward
+    H_styp = self.CLN(torch.stack(H_ss), torch.stack(H_cs))
+  File "/root/miniconda3/envs/myconda/lib/python3.7/site-packages/torch/nn/modules/module.py", line 541, in __call__
+    result = self.forward(*input, **kwargs)
+  File "../models/conditional_layer_normalization.py", line 29, in forward
+    denormed_repr = weight * normed_repr + bias # weight and bias (bsz, 1, hidden_size)
+RuntimeError: The size of tensor a (8) must match the size of tensor b (389) at non-singleton dimension 1
+(myconda) root@459fbea441a1:/mnt/extraction_eval_1/train# vim ../models/sentence_representation_layer.py 
+(myconda) root@459fbea441a1:/mnt/extraction_eval_1/train# python event_detection_training.py train_trigger_extraction
+2021-03-24 00:18:57.617187: I tensorflow/stream_executor/platform/default/dso_loader.cc:48] Successfully opened dynamic library libcudart.so.10.1
+../models/trigger_extraction_model.py:36: UserWarning: nn.init.xavier_uniform is now deprecated in favor of nn.init.xavier_uniform_.
+  torch.nn.init.xavier_uniform(self.fcn_start.weight)
+../models/trigger_extraction_model.py:37: UserWarning: nn.init.xavier_uniform is now deprecated in favor of nn.init.xavier_uniform_.
+  torch.nn.init.xavier_uniform(self.fcn_end.weight)
+../models/trigger_extraction_model.py:40: UserWarning: nn.init.xavier_uniform is now deprecated in favor of nn.init.xavier_uniform_.
+  torch.nn.init.xavier_uniform(self.q_net.weight)
+../models/trigger_extraction_model.py:41: UserWarning: nn.init.xavier_uniform is now deprecated in favor of nn.init.xavier_uniform_.
+  torch.nn.init.xavier_uniform(self.kv_net.weight)
+../models/trigger_extraction_model.py:42: UserWarning: nn.init.xavier_uniform is now deprecated in favor of nn.init.xavier_uniform_.
+  torch.nn.init.xavier_uniform(self.o_net.weight)
+sentences ['公告显示,公司于2019年3月28日接到股东永辉超市股份有限公司(“收购人”)书面通知,被告知:收购人拟通过要约收购的方式将其直接和间接合计持有的中百控股集团股份有限公司的股份比例从目前29.86%提高至最多不超过40%。', '根据浙滨开发于2019年10月29日发布的公告:一、公司名称由“浙江滨海新城开发投资股份有限公司”变更为“浙江滨海新城开发投资有限公司”;二、原股东绍兴市交通投资集团有限公司、绍兴市上虞区交通投资有限公司以及绍兴市柯桥区国有资产投资经营集团有限公司将所持有的公司全部股权转让至绍兴滨海新城发展集团有限公司,本次股权变更后,绍兴滨海新城发展集团有限公司持有公司100%的股权,公司控股股东由绍兴市交通投资集团有限公司变更为绍兴滨海新城发展集团有限公司,公司实际控制人仍为绍兴市人民政府国有资产监督管理委员会;三、公司住所由浙江省绍兴市滨海新城海东大道西路99号变更为浙江省绍兴市滨海新城南滨东路98号4楼;四、企业类型由股份有限公司变更为有限责任公司;五、企业类型变更为有限责任公司后,原股份有限公司的董事、监事、高级管理人员同时免去,陈冠能、王小红、徐建效、朱卫东、周波任公司董事,吴立平、孙季君、周民阳、金祖民、胡沛锦任公司监事,徐建效任公司总经理,公司法定代表人变更前后均为陈冠能。', '西藏德锦计划11月6日起6个月内,累计增持股份数量(含本次已增持股份)不低于公司总股本的2%,且不超公司总股本的5%,增持价格不超过12.50元/股。', '去年年底,因宝沃财政吃紧,陷入巨额亏损的福田汽车决定抛售宝沃67%股权;2个月后,神州接盘。', '据公告显示,北新建材以2.73亿元的价格受让河南金拇指70%股权,截至2019年5月31日,河南金拇指资产总额为7亿元,营业收入为2.39亿元,净利润为2874.53万元;与此同时,拟以约7.69亿元的价格收购禹王防水、四川禹王、安徽禹王、湖北禹王、广东禹王、禹王工程、禹王橡胶及禹王化纤8家公司(下统称禹王集团)的70%股权。', '根据质押日泰豪科技收盘价5.90元进行估算,泰豪集团有限公司本次质押股票市值约为1.44亿元。', '擅长逆向投资的淡水泉投资掌门人赵军管理的私募基金出现在13家上市公司的前十大流通股东名单之中,新晋为两家公司前十大流通股东:中牧股份和华宇软件;增持了三环集团,减持了驰宏锌锗、东软集团、新大陆;同时退出了环旭电子、生益科技、健康元、丽珠集团、洁美科技等公司前十大流通股东。', '相关数据显示,目前誉衡集团持有的公司股份已质押99.96%,誉衡国际持有的公司股份已质押100%。']
+types ['股份股权转让', '投资', '投资', '股份股权转让', '股份股权转让', '质押', '减持', '质押']
+tensor([[ 101, 5500,  819,  ...,    0,    0,    0],
+        [ 101, 2832, 6598,  ..., 5543,  511,  102],
+        [ 101, 2832, 6598,  ...,    0,    0,    0],
+        ...,
+        [ 101, 6574, 2852,  ...,    0,    0,    0],
+        [ 101, 1121, 2898,  ...,    0,    0,    0],
+        [ 101, 6574, 2852,  ...,    0,    0,    0]], device='cuda:0')
+max 389 [326, 0, 362, 385, 278, 389, 299, 389]
+torch.Size([389, 768])
+torch.Size([389, 768])
+torch.Size([389, 768])
+Traceback (most recent call last):
+  File "event_detection_training.py", line 130, in <module>
+    fire.Fire()
+  File "/root/miniconda3/envs/myconda/lib/python3.7/site-packages/fire/core.py", line 138, in Fire
+    component_trace = _Fire(component, args, parsed_flag_args, context, name)
+  File "/root/miniconda3/envs/myconda/lib/python3.7/site-packages/fire/core.py", line 468, in _Fire
+    target=component.__name__)
+  File "/root/miniconda3/envs/myconda/lib/python3.7/site-packages/fire/core.py", line 672, in _CallAndUpdateTrace
+    component = fn(*varargs, **kwargs)
+  File "event_detection_training.py", line 116, in train_trigger_extraction
+    h_styp = repr_model(batch_, typ_batch)
+  File "/root/miniconda3/envs/myconda/lib/python3.7/site-packages/torch/nn/modules/module.py", line 541, in __call__
+    result = self.forward(*input, **kwargs)
+  File "../models/sentence_representation_layer.py", line 59, in forward
+    H_styp = self.CLN(torch.stack(H_ss), torch.stack(H_cs))
+  File "/root/miniconda3/envs/myconda/lib/python3.7/site-packages/torch/nn/modules/module.py", line 541, in __call__
+    result = self.forward(*input, **kwargs)
+  File "../models/conditional_layer_normalization.py", line 29, in forward
+    denormed_repr = weight * normed_repr + bias # weight and bias (bsz, 1, hidden_size)
+RuntimeError: The size of tensor a (8) must match the size of tensor b (389) at non-singleton dimension 1
+(myconda) root@459fbea441a1:/mnt/extraction_eval_1/train# vim ../models/sentence_representation_layer.py 
+(myconda) root@459fbea441a1:/mnt/extraction_eval_1/train# python event_detection_training.py train_trigger_extraction
+2021-03-24 00:23:09.882831: I tensorflow/stream_executor/platform/default/dso_loader.cc:48] Successfully opened dynamic library libcudart.so.10.1
+../models/trigger_extraction_model.py:36: UserWarning: nn.init.xavier_uniform is now deprecated in favor of nn.init.xavier_uniform_.
+  torch.nn.init.xavier_uniform(self.fcn_start.weight)
+../models/trigger_extraction_model.py:37: UserWarning: nn.init.xavier_uniform is now deprecated in favor of nn.init.xavier_uniform_.
+  torch.nn.init.xavier_uniform(self.fcn_end.weight)
+../models/trigger_extraction_model.py:40: UserWarning: nn.init.xavier_uniform is now deprecated in favor of nn.init.xavier_uniform_.
+  torch.nn.init.xavier_uniform(self.q_net.weight)
+../models/trigger_extraction_model.py:41: UserWarning: nn.init.xavier_uniform is now deprecated in favor of nn.init.xavier_uniform_.
+  torch.nn.init.xavier_uniform(self.kv_net.weight)
+../models/trigger_extraction_model.py:42: UserWarning: nn.init.xavier_uniform is now deprecated in favor of nn.init.xavier_uniform_.
+  torch.nn.init.xavier_uniform(self.o_net.weight)
+sentences ['公告显示,公司于2019年3月28日接到股东永辉超市股份有限公司(“收购人”)书面通知,被告知:收购人拟通过要约收购的方式将其直接和间接合计持有的中百控股集团股份有限公司的股份比例从目前29.86%提高至最多不超过40%。', '根据浙滨开发于2019年10月29日发布的公告:一、公司名称由“浙江滨海新城开发投资股份有限公司”变更为“浙江滨海新城开发投资有限公司”;二、原股东绍兴市交通投资集团有限公司、绍兴市上虞区交通投资有限公司以及绍兴市柯桥区国有资产投资经营集团有限公司将所持有的公司全部股权转让至绍兴滨海新城发展集团有限公司,本次股权变更后,绍兴滨海新城发展集团有限公司持有公司100%的股权,公司控股股东由绍兴市交通投资集团有限公司变更为绍兴滨海新城发展集团有限公司,公司实际控制人仍为绍兴市人民政府国有资产监督管理委员会;三、公司住所由浙江省绍兴市滨海新城海东大道西路99号变更为浙江省绍兴市滨海新城南滨东路98号4楼;四、企业类型由股份有限公司变更为有限责任公司;五、企业类型变更为有限责任公司后,原股份有限公司的董事、监事、高级管理人员同时免去,陈冠能、王小红、徐建效、朱卫东、周波任公司董事,吴立平、孙季君、周民阳、金祖民、胡沛锦任公司监事,徐建效任公司总经理,公司法定代表人变更前后均为陈冠能。', '西藏德锦计划11月6日起6个月内,累计增持股份数量(含本次已增持股份)不低于公司总股本的2%,且不超公司总股本的5%,增持价格不超过12.50元/股。', '去年年底,因宝沃财政吃紧,陷入巨额亏损的福田汽车决定抛售宝沃67%股权;2个月后,神州接盘。', '据公告显示,北新建材以2.73亿元的价格受让河南金拇指70%股权,截至2019年5月31日,河南金拇指资产总额为7亿元,营业收入为2.39亿元,净利润为2874.53万元;与此同时,拟以约7.69亿元的价格收购禹王防水、四川禹王、安徽禹王、湖北禹王、广东禹王、禹王工程、禹王橡胶及禹王化纤8家公司(下统称禹王集团)的70%股权。', '根据质押日泰豪科技收盘价5.90元进行估算,泰豪集团有限公司本次质押股票市值约为1.44亿元。', '擅长逆向投资的淡水泉投资掌门人赵军管理的私募基金出现在13家上市公司的前十大流通股东名单之中,新晋为两家公司前十大流通股东:中牧股份和华宇软件;增持了三环集团,减持了驰宏锌锗、东软集团、新大陆;同时退出了环旭电子、生益科技、健康元、丽珠集团、洁美科技等公司前十大流通股东。', '相关数据显示,目前誉衡集团持有的公司股份已质押99.96%,誉衡国际持有的公司股份已质押100%。']
+types ['股份股权转让', '投资', '投资', '股份股权转让', '股份股权转让', '质押', '减持', '质押']
+tensor([[ 101, 5500,  819,  ...,    0,    0,    0],
+        [ 101, 2832, 6598,  ..., 5543,  511,  102],
+        [ 101, 2832, 6598,  ...,    0,    0,    0],
+        ...,
+        [ 101, 6574, 2852,  ...,    0,    0,    0],
+        [ 101, 1121, 2898,  ...,    0,    0,    0],
+        [ 101, 6574, 2852,  ...,    0,    0,    0]], device='cuda:0')
+sep [7, 112, 3, 438, 3, 76, 7, 53, 7, 160, 3, 49, 3, 139, 3, 49]
+max 389 [326, 0, 362, 385, 278, 389, 299, 389]
+torch.Size([389, 768])
+torch.Size([389, 768])
+torch.Size([389, 768])
+Traceback (most recent call last):
+  File "event_detection_training.py", line 130, in <module>
+    fire.Fire()
+  File "/root/miniconda3/envs/myconda/lib/python3.7/site-packages/fire/core.py", line 138, in Fire
+    component_trace = _Fire(component, args, parsed_flag_args, context, name)
+  File "/root/miniconda3/envs/myconda/lib/python3.7/site-packages/fire/core.py", line 468, in _Fire
+    target=component.__name__)
+  File "/root/miniconda3/envs/myconda/lib/python3.7/site-packages/fire/core.py", line 672, in _CallAndUpdateTrace
+    component = fn(*varargs, **kwargs)
+  File "event_detection_training.py", line 116, in train_trigger_extraction
+    h_styp = repr_model(batch_, typ_batch)
+  File "/root/miniconda3/envs/myconda/lib/python3.7/site-packages/torch/nn/modules/module.py", line 541, in __call__
+    result = self.forward(*input, **kwargs)
+  File "../models/sentence_representation_layer.py", line 60, in forward
+    H_styp = self.CLN(torch.stack(H_ss), torch.stack(H_cs))
+  File "/root/miniconda3/envs/myconda/lib/python3.7/site-packages/torch/nn/modules/module.py", line 541, in __call__
+    result = self.forward(*input, **kwargs)
+  File "../models/conditional_layer_normalization.py", line 29, in forward
+    denormed_repr = weight * normed_repr + bias # weight and bias (bsz, 1, hidden_size)
+RuntimeError: The size of tensor a (8) must match the size of tensor b (389) at non-singleton dimension 1
+(myconda) root@459fbea441a1:/mnt/extraction_eval_1/train# vim ../models/sentence_representation_layer.py 
+(myconda) root@459fbea441a1:/mnt/extraction_eval_1/train# python event_detection_training.py train_trigger_extraction
+2021-03-24 00:27:35.261276: I tensorflow/stream_executor/platform/default/dso_loader.cc:48] Successfully opened dynamic library libcudart.so.10.1
+../models/trigger_extraction_model.py:36: UserWarning: nn.init.xavier_uniform is now deprecated in favor of nn.init.xavier_uniform_.
+  torch.nn.init.xavier_uniform(self.fcn_start.weight)
+../models/trigger_extraction_model.py:37: UserWarning: nn.init.xavier_uniform is now deprecated in favor of nn.init.xavier_uniform_.
+  torch.nn.init.xavier_uniform(self.fcn_end.weight)
+../models/trigger_extraction_model.py:40: UserWarning: nn.init.xavier_uniform is now deprecated in favor of nn.init.xavier_uniform_.
+  torch.nn.init.xavier_uniform(self.q_net.weight)
+../models/trigger_extraction_model.py:41: UserWarning: nn.init.xavier_uniform is now deprecated in favor of nn.init.xavier_uniform_.
+  torch.nn.init.xavier_uniform(self.kv_net.weight)
+../models/trigger_extraction_model.py:42: UserWarning: nn.init.xavier_uniform is now deprecated in favor of nn.init.xavier_uniform_.
+  torch.nn.init.xavier_uniform(self.o_net.weight)
+sentences ['公告显示,公司于2019年3月28日接到股东永辉超市股份有限公司(“收购人”)书面通知,被告知:收购人拟通过要约收购的方式将其直接和间接合计持有的中百控股集团股份有限公司的股份比例从目前29.86%提高至最多不超过40%。', '根据浙滨开发于2019年10月29日发布的公告:一、公司名称由“浙江滨海新城开发投资股份有限公司”变更为“浙江滨海新城开发投资有限公司”;二、原股东绍兴市交通投资集团有限公司、绍兴市上虞区交通投资有限公司以及绍兴市柯桥区国有资产投资经营集团有限公司将所持有的公司全部股权转让至绍兴滨海新城发展集团有限公司,本次股权变更后,绍兴滨海新城发展集团有限公司持有公司100%的股权,公司控股股东由绍兴市交通投资集团有限公司变更为绍兴滨海新城发展集团有限公司,公司实际控制人仍为绍兴市人民政府国有资产监督管理委员会;三、公司住所由浙江省绍兴市滨海新城海东大道西路99号变更为浙江省绍兴市滨海新城南滨东路98号4楼;四、企业类型由股份有限公司变更为有限责任公司;五、企业类型变更为有限责任公司后,原股份有限公司的董事、监事、高级管理人员同时免去,陈冠能、王小红、徐建效、朱卫东、周波任公司董事,吴立平、孙季君、周民阳、金祖民、胡沛锦任公司监事,徐建效任公司总经理,公司法定代表人变更前后均为陈冠能。', '西藏德锦计划11月6日起6个月内,累计增持股份数量(含本次已增持股份)不低于公司总股本的2%,且不超公司总股本的5%,增持价格不超过12.50元/股。', '去年年底,因宝沃财政吃紧,陷入巨额亏损的福田汽车决定抛售宝沃67%股权;2个月后,神州接盘。', '据公告显示,北新建材以2.73亿元的价格受让河南金拇指70%股权,截至2019年5月31日,河南金拇指资产总额为7亿元,营业收入为2.39亿元,净利润为2874.53万元;与此同时,拟以约7.69亿元的价格收购禹王防水、四川禹王、安徽禹王、湖北禹王、广东禹王、禹王工程、禹王橡胶及禹王化纤8家公司(下统称禹王集团)的70%股权。', '根据质押日泰豪科技收盘价5.90元进行估算,泰豪集团有限公司本次质押股票市值约为1.44亿元。', '擅长逆向投资的淡水泉投资掌门人赵军管理的私募基金出现在13家上市公司的前十大流通股东名单之中,新晋为两家公司前十大流通股东:中牧股份和华宇软件;增持了三环集团,减持了驰宏锌锗、东软集团、新大陆;同时退出了环旭电子、生益科技、健康元、丽珠集团、洁美科技等公司前十大流通股东。', '相关数据显示,目前誉衡集团持有的公司股份已质押99.96%,誉衡国际持有的公司股份已质押100%。']
+types ['股份股权转让', '投资', '投资', '股份股权转让', '股份股权转让', '质押', '减持', '质押']
+tensor([[ 101, 5500,  819,  ...,    0,    0,    0],
+        [ 101, 2832, 6598,  ..., 5543,  511,  102],
+        [ 101, 2832, 6598,  ...,    0,    0,    0],
+        ...,
+        [ 101, 6574, 2852,  ...,    0,    0,    0],
+        [ 101, 1121, 2898,  ...,    0,    0,    0],
+        [ 101, 6574, 2852,  ...,    0,    0,    0]], device='cuda:0')
+sep [7, 112, 3, 438, 3, 76, 7, 53, 7, 160, 3, 49, 3, 139, 3, 49]
+max 435 [105, 435, 73, 46, 153, 46, 136, 46]
+torch.Size([435, 768])
+torch.Size([435, 768])
+torch.Size([435, 768])
+Traceback (most recent call last):
+  File "event_detection_training.py", line 130, in <module>
+    fire.Fire()
+  File "/root/miniconda3/envs/myconda/lib/python3.7/site-packages/fire/core.py", line 138, in Fire
+    component_trace = _Fire(component, args, parsed_flag_args, context, name)
+  File "/root/miniconda3/envs/myconda/lib/python3.7/site-packages/fire/core.py", line 468, in _Fire
+    target=component.__name__)
+  File "/root/miniconda3/envs/myconda/lib/python3.7/site-packages/fire/core.py", line 672, in _CallAndUpdateTrace
+    component = fn(*varargs, **kwargs)
+  File "event_detection_training.py", line 116, in train_trigger_extraction
+    h_styp = repr_model(batch_, typ_batch)
+  File "/root/miniconda3/envs/myconda/lib/python3.7/site-packages/torch/nn/modules/module.py", line 541, in __call__
+    result = self.forward(*input, **kwargs)
+  File "../models/sentence_representation_layer.py", line 60, in forward
+    H_styp = self.CLN(torch.stack(H_ss), torch.stack(H_cs))
+  File "/root/miniconda3/envs/myconda/lib/python3.7/site-packages/torch/nn/modules/module.py", line 541, in __call__
+    result = self.forward(*input, **kwargs)
+  File "../models/conditional_layer_normalization.py", line 29, in forward
+    denormed_repr = weight * normed_repr + bias # weight and bias (bsz, 1, hidden_size)
+RuntimeError: The size of tensor a (8) must match the size of
