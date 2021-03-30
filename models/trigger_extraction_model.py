@@ -21,6 +21,8 @@ class TriggerExtractionModel(nn.Module):
         self.d_head = d_head
         self.dropout_prob = dropout_prob
         self.syntactic_size = syntactic_size
+        self.pass_attn = pass_attn
+        self.pass_syn = pass_syn
 
         # W_q, W_k and W_v
         self.q_net = nn.Linear(self.hidden_size, self.num_heads * self.d_head, bias=False)
@@ -84,6 +86,10 @@ class TriggerExtractionModel(nn.Module):
         # print('cln',  cln_embeds.size())
         # print('att', attn_out.size())
         # print('syn', syntactic_structure.size())
+        if self.pass_attn:
+            attn_out = torch.zeros(attn_out.size()).cuda()
+        if self.pass_syn:
+            syntactic_structure = torch.zeros(syntactic_structure.size())
         final_repr = torch.cat((cln_embeds, attn_out, syntactic_structure.cuda()), dim=-1) # got (bsz, seq_l, hidden * 2 + syn)
         # linear
         #   got both (bsz, seq_l, 1), convert to (bsz, seq_l)
