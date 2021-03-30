@@ -92,7 +92,7 @@ def train_trigger_extraction(repr_lr=2e-5, tem_lr = 1e-4, epoch=20, epoch_save_c
 
     # define models and optimizers
     repr_model = SentenceRepresentation(model_path, config.hidden_size, pass_cln=True)
-    tem = TriggerExtractionModel(n_head, config.hidden_size, d_head, config.hidden_dropout_prob, ltp_feature_cnt_fixed)
+    tem = TriggerExtractionModel(n_head, config.hidden_size, d_head, config.hidden_dropout_prob, ltp_feature_cnt_fixed, pass_attn=True, pass_syn=True)
     optimizer_repr_plm = AdamW(repr_model.PLM.parameters(), lr=repr_lr)
     optimizer_repr_cln = AdamW(repr_model.CLN.parameters(), lr=tem_lr)
     optimizer_tem = AdamW(tem.parameters(), lr=tem_lr)
@@ -162,4 +162,12 @@ def train_trigger_extraction(repr_lr=2e-5, tem_lr = 1e-4, epoch=20, epoch_save_c
 
 
 if __name__ == '__main__':
-    fire.Fire()
+    # fire.Fire()
+    import time
+    while True:
+        try:
+            train_trigger_extraction()
+        except RuntimeError:
+            pass
+        print('retrying...')
+        time.sleep(1)
