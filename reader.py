@@ -132,7 +132,7 @@ def trigger_extraction_reader():
         token_l_without_placeholder = len(token2origin) - 2 # todo 我没有在matches中统计结尾的SEP与CLS
         delete_token_l_without_placeholder.append(token_l_without_placeholder)
         # 因为不包含CLS与SEP，所以计算出来的token coord需要减1, end还需要额外减一，
-        token_start, token_end = origin2token[trigger_start] - 1, origin2token[trigger_end] - 2
+        token_start, token_end = origin2token[trigger_start] - 1, origin2token[trigger_end - 1] - 1
         start_tensor, end_tensor = torch.zeros(token_l_without_placeholder), torch.zeros(token_l_without_placeholder)
         start_tensor[token_start], end_tensor[token_end] = 1, 1
         gts.append([start_tensor, end_tensor])
