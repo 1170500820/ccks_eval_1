@@ -12,8 +12,8 @@ class ConditionalLayerNormalization(nn.Module):
         :param pass_layer_norm: if True, just return the representation, pass the cln procedure
         """
         super(ConditionalLayerNormalization, self).__init__()
-        self.weight_map = nn.Linear(hidden_size, hidden_size, bias=False)   # todo bias=False?
-        self.bias_map = nn.Linear(hidden_size, hidden_size, bias=False)
+        self.weight_map = nn.Linear(hidden_size, hidden_size)   # todo bias=False?
+        self.bias_map = nn.Linear(hidden_size, hidden_size)
         self.hidden_size = hidden_size
         self.eps = eps
         self.pass_layer_norm = pass_layer_norm
@@ -34,6 +34,7 @@ class ConditionalLayerNormalization(nn.Module):
         repr_mean = torch.mean(representation, dim=-2).unsqueeze(dim=-2)   # (bsz, 1, hidden)
         repr_var = torch.var(representation, dim=-2, unbiased=False).unsqueeze(dim=-2) # (bsz, 1, hidden)
         normed_repr = (representation - repr_mean) / torch.sqrt(repr_var + self.eps)    # (bsz, seq_l, hidden)
-        denormed_repr = weight * normed_repr + bias # weight and bias (bsz, 1, hidden_size)
+        denormed_repr = torch.mul(weight, normed_repr) + bias # weight and bias (bsz, 1, hidden_size)
+
         # 这个CLN可以手动实现吗
         return denormed_repr
