@@ -7,6 +7,7 @@ from transformers import AdamW, BertConfig
 from models.event_detection import *
 from models.sentence_representation_layer import *
 from models.trigger_extraction_model import *
+from evaluate.eval_utils import *
 import torch
 import torch.nn.functional as F
 import pickle
@@ -143,6 +144,7 @@ def train_trigger_extraction(repr_lr=2e-5, tem_lr = 1e-4, epoch=20, epoch_save_c
                 results = []
 
                 total = 0
+                predict = 0
                 correct = 0
                 left_part_correct = 0
                 right_part_correct = 0
@@ -151,34 +153,30 @@ def train_trigger_extraction(repr_lr=2e-5, tem_lr = 1e-4, epoch=20, epoch_save_c
                     send_tokens = tokenizer.convert_ids_to_tokens(tokenizer(val_sent)['input_ids'])
                     val_h_styp = repr_model(val_sent, val_types[i_val])
                     start_logits, end_logits = tem(val_h_styp, val_syntactic_features[i_val])   # both (1, seq_l)
-                    start_logits = start_logits.squeeze()
-                    end_logits = end_logits.squeeze()
-                    # print(start_logits)
-                    # print(end_logits)
-                    start, end = start_logits.argmax(dim=0), end_logits.argmax(dim=0)
-                    cur_span = spans[i_val]
-                    if start == cur_span[0] and end == cur_span[1] - 1: # todo 不要忘了标注集的偏移！！！
-                        correct += 1
-                    elif start == cur_span[0] or end == cur_span[1] - 1:
-                        left_part_correct += 1
-                    elif end == cur_span[1] - 1:
-                        right_part_correct += 1
-                    else:
-                        # print('origin sent:' + val_sent)
-                        # print('gt span:', cur_span, '\tword:', send_tokens[1:-1][cur_span[0]: cur_span[1]])
-                        # print('result span:', (int(start),  int(end)), '\tword:', send_tokens[1:-1][int(start): int(end)+ 1])
-                        if send_tokens[1:-1][cur_span[0]: cur_span[1]] == send_tokens[1:-1][int(start): int(end)+ 1]:
-                            word_correct += 1
-                    total += 1
-                print(f'total:{total} correct:{correct}, precision:{correct / total}')
-                print(f'left part correct:{left_part_correct}, right part correct:{right_part_correct}, '
-                      f'part-precision:{(correct + left_part_correct + right_part_correct) / total}')
-                print(f'word correct:{word_correct}, word correct precision:{(correct + word_correct)/ total}')
-                print(f'word and part correct precition:'
-                      f'{(correct + word_correct + left_part_correct + right_part_correct) / total}')
+                    # print('starts:', start_logits)
+                    # print('start\'s size:', start_logits.size())
+                    # print('ends:', end_logits)
+                    start_logits = start_logits.squeeze()   # (seq_l)
+                    end_logits = end_logits.squeeze()   # (seq_l)
+                    # print('start after squeeze:', start_logits)
+                    # print('end after squeeze:', end_logits)
+                    binary_starts = (start_logits >= trigger_extraction_threshold).long()
+                    binary_ends = (end_logits >= trigger_extraction_threshold).long()
+                    # print('binary starts:', binary_starts)
+                    # print('binary ends:', binary_ends)
+                    # start, end = start_logits.argmax(dim=0), end_logits.argmax(dim=0)
+                    result_spans = argument_span_determination(binary_starts, binary_ends, start_logits, end_logits)
+                    cur_span = set(map(lambda x: (x[0], x[1] - 1), spans[i_val])) # {(start, end), ...}
+                    result_spans_set = set(map(tuple, result_spans))
+                    total += len(cur_span)
+                    predict += len(result_spans_set)
+                    correct += len(cur_span.intersection(result_spans_set))
+                recall = correct / total if total != 0 else 0
+                precision = correct / predict if predict != 0 else 0
+                f_measure = (2 * recall * precision) / (recall + precision) if recall + precision != 0 else 0
+                print(f'total:{total} predict:{predict}, correct:{correct}, precision:{precision}, recall:{recall}, f:{f_measure}')
                 tem.train()
                 repr_model.train()
-
 
 
 if __name__ == '__main__':
