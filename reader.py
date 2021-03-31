@@ -86,7 +86,12 @@ def trigger_extraction_reader():
         cur_segment_tensor = segment_feature_tensors[i]
         cur_postag_tensor = postag_feature_tensors[i]
         cur_ner_tensor = ner_feature_tensors[i]
+        type_set = set()
         for e in events:
+            if e['type'] in type_set:   # 去除重复事件类型。
+                continue
+            else:
+                type_set.add(e['type'])
             cur_event_type = e['type']
             mentions = e['mentions']
             cur_trigger = None
