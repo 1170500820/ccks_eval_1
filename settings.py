@@ -146,3 +146,4 @@ sentence_representation_bsz = 4
 # Eval
 train_val_split_ratio = 0.9
 event_detection_theshold = 0.5
+trigger_extraction_threshold = 0.5
