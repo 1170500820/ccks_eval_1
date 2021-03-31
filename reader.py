@@ -203,14 +203,17 @@ def trigger_extraction_reader():
     pickle.dump([train_sentences_batch, train_types_batch, train_gts_batch, train_syntactic_batch],
                 open('train_data_for_trigger_extraction.pk', 'wb'))
     #   prepare evaluating data
-    spans = []
+    spans = []  # [[], ...]
     val_syns = []
     for i, sentence in enumerate(val_sentences):
         token2origin, origin2token = val_sent_match[i]
         cur_trigger = val_triggers[i]
-        trigger_start, trigger_end = cur_trigger[0]
-        start, end = origin2token[trigger_start] - 1, origin2token[trigger_end] - 1
-        spans.append([start, end])
+        cur_sent_spans = []
+        for trig in cur_trigger:
+            trigger_start, trigger_end = trig
+            start, end = origin2token[trigger_start] - 1, origin2token[trigger_end] - 1
+            cur_sent_spans.append((start, end))
+        spans.append(cur_sent_spans)
         val_seg_feature, val_pos_feature, val_ner_feature = \
             val_syntactic_features[i][0], val_syntactic_features[i][1], val_syntactic_features[i][2]
         val_syns.append(torch.cat([val_seg_feature, val_pos_feature, val_ner_feature], dim=1).unsqueeze(dim=0))
