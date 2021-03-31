@@ -140,7 +140,7 @@ event_detection_bsz = 8
 event_detection_model = 'bert'
 
 
-sentence_representation_bsz = 8
+sentence_representation_bsz = 4
 
 
 # Eval
