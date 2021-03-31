@@ -89,10 +89,11 @@ def train_event_detection(lr=3e-5, epoch=20, epoch_save_cnt=3, val=True, val_fre
 
 def train_trigger_extraction(repr_lr=2e-5, tem_lr = 1e-4, epoch=20, epoch_save_cnt=3, val=True, val_freq=300):
     config = BertConfig.from_pretrained(model_path)
+    tokenizer = BertTokenizer.from_pretrained(model_path)
 
     # define models and optimizers
-    repr_model = SentenceRepresentation(model_path, config.hidden_size, pass_cln=True)
-    tem = TriggerExtractionModel(n_head, config.hidden_size, d_head, config.hidden_dropout_prob, ltp_feature_cnt_fixed, pass_attn=True, pass_syn=True)
+    repr_model = SentenceRepresentation(model_path, config.hidden_size, pass_cln=False)
+    tem = TriggerExtractionModel(n_head, config.hidden_size, d_head, config.hidden_dropout_prob, ltp_feature_cnt_fixed, pass_attn=False, pass_syn=False)
     optimizer_repr_plm = AdamW(repr_model.PLM.parameters(), lr=repr_lr)
     optimizer_repr_cln = AdamW(repr_model.CLN.parameters(), lr=tem_lr)
     optimizer_tem = AdamW(tem.parameters(), lr=tem_lr)
@@ -143,7 +144,11 @@ def train_trigger_extraction(repr_lr=2e-5, tem_lr = 1e-4, epoch=20, epoch_save_c
 
                 total = 0
                 correct = 0
-                for i_val, val_sent in tqdm(list(enumerate(val_sentences))):
+                left_part_correct = 0
+                right_part_correct = 0
+                word_correct = 0
+                for i_val, val_sent in list(enumerate(val_sentences)):
+                    send_tokens = tokenizer.convert_ids_to_tokens(tokenizer(val_sent)['input_ids'])
                     val_h_styp = repr_model(val_sent, val_types[i_val])
                     start_logits, end_logits = tem(val_h_styp, val_syntactic_features[i_val])   # both (1, seq_l)
                     start_logits = start_logits.squeeze()
@@ -154,20 +159,28 @@ def train_trigger_extraction(repr_lr=2e-5, tem_lr = 1e-4, epoch=20, epoch_save_c
                     cur_span = spans[i_val]
                     if start == cur_span[0] and end == cur_span[1] - 1: # todo 不要忘了标注集的偏移！！！
                         correct += 1
+                    elif start == cur_span[0] or end == cur_span[1] - 1:
+                        left_part_correct += 1
+                    elif end == cur_span[1] - 1:
+                        right_part_correct += 1
+                    else:
+                        # print('origin sent:' + val_sent)
+                        # print('gt span:', cur_span, '\tword:', send_tokens[1:-1][cur_span[0]: cur_span[1]])
+                        # print('result span:', (int(start),  int(end)), '\tword:', send_tokens[1:-1][int(start): int(end)+ 1])
+                        if send_tokens[1:-1][cur_span[0]: cur_span[1]] == send_tokens[1:-1][int(start): int(end)+ 1]:
+                            word_correct += 1
                     total += 1
                 print(f'total:{total} correct:{correct}, precision:{correct / total}')
+                print(f'left part correct:{left_part_correct}, right part correct:{right_part_correct}, '
+                      f'part-precision:{(correct + left_part_correct + right_part_correct) / total}')
+                print(f'word correct:{word_correct}, word correct precision:{(correct + word_correct)/ total}')
+                print(f'word and part correct precition:'
+                      f'{(correct + word_correct + left_part_correct + right_part_correct) / total}')
                 tem.train()
                 repr_model.train()
 
 
 
 if __name__ == '__main__':
-    # fire.Fire()
-    import time
-    while True:
-        try:
-            train_trigger_extraction()
-        except RuntimeError:
-            pass
-        print('retrying...')
-        time.sleep(1)
+    fire.Fire()
+
