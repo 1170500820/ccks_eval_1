@@ -95,7 +95,7 @@ class TriggerExtractionModel(nn.Module):
         #   got both (bsz, seq_l, 1), convert to (bsz, seq_l)
         start_logits, end_logits = self.fcn_start(final_repr).squeeze(), self.fcn_end(final_repr).squeeze()
         # sigmoid
-        # starts, ends = F.sigmoid(start_logits), F.sigmoid(end_logits)   # got both (bsz, seq_l, 2)
+        starts, ends = F.sigmoid(start_logits), F.sigmoid(end_logits)   # got both (bsz, seq_l)
         # todo 暂时跳过，使用binary_cross_entropy_with_logits
-        starts, ends = F.softmax(start_logits), F.softmax(end_logits)   # both (bsz, seq_l)
+        # starts, ends = F.softmax(start_logits), F.softmax(end_logits)   # both (bsz, seq_l)
         return starts, ends
