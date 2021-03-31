@@ -86,25 +86,27 @@ def trigger_extraction_reader():
         cur_segment_tensor = segment_feature_tensors[i]
         cur_postag_tensor = postag_feature_tensors[i]
         cur_ner_tensor = ner_feature_tensors[i]
-        type_set = set()
+        cur_sentence = d['content'].lower().replace(' ', '_')
+        type_dict = {}  # key:event type  value:[trigger_span1, trigger_span2, ...]
         for e in events:
-            if e['type'] in type_set:   # 去除重复事件类型。
-                continue
-            else:
-                type_set.add(e['type'])
             cur_event_type = e['type']
+            if cur_event_type not in type_dict:
+                type_dict[cur_event_type] = []
             mentions = e['mentions']
             cur_trigger = None
             for mention in mentions:
                 if mention['role'] == 'trigger':
-                    cur_trigger = [mention['span'], mention['word']]  # [span, word]
+                    cur_trigger = mention['span']  # [start, end]
             if cur_trigger is None:  # there must be one and only one trigger in a event
-                continue
-            sentences.append(d['content'].lower().replace(' ', '_'))
+                raise Exception('no trigger exception')
+            type_dict[cur_event_type].append(tuple(cur_trigger))    # 为了后面使用set去除重复，这里要改成tuple
+
+        for key, value in type_dict.items():
+            sentences.append(cur_sentence)
             syntactic.append([cur_segment_tensor, cur_postag_tensor, cur_ner_tensor])
-            types.append(cur_event_type)
+            types.append(key)
             sent_match.append(cur_match)
-            triggers.append(cur_trigger)
+            triggers.append(list(set(value)))  # 更改之后，现在triggers中包含多个trigger, (int, int) --> [(int, int), ...]
 
     # randomize
     zipped = list(zip(sentences, types, sent_match, triggers, syntactic))
@@ -128,7 +130,6 @@ def trigger_extraction_reader():
     for i, sentence in enumerate(train_sentences):
         token2origin, origin2token = train_sent_match[i]
         cur_trigger = train_triggers[i]
-        trigger_start, trigger_end = cur_trigger[0]
         # the data be like:
         # sent:     除 上 述 质 押 股 份 外 , 卓 众 达 富 持 有 的
         #           0  1 2 |3  4|5  6 7  8 9 10 11 12 13 14 15
@@ -136,10 +137,12 @@ def trigger_extraction_reader():
         # span:     3, 5
         token_l_without_placeholder = len(token2origin) - 2 # todo 我没有在matches中统计结尾的SEP与CLS
         delete_token_l_without_placeholder.append(token_l_without_placeholder)
-        # 因为不包含CLS与SEP，所以计算出来的token coord需要减1, end还需要额外减一，
-        token_start, token_end = origin2token[trigger_start] - 1, origin2token[trigger_end - 1] - 1
         start_tensor, end_tensor = torch.zeros(token_l_without_placeholder), torch.zeros(token_l_without_placeholder)
-        start_tensor[token_start], end_tensor[token_end] = 1, 1
+        for cur_span in cur_trigger:
+            trigger_start, trigger_end = cur_span
+            # 因为不包含CLS与SEP，所以计算出来的token coord需要减1, end还需要额外减一，
+            token_start, token_end = origin2token[trigger_start] - 1, origin2token[trigger_end - 1] - 1
+            start_tensor[token_start], end_tensor[token_end] = 1, 1
         gts.append([start_tensor, end_tensor])
     #   simple batchify
     train_sentences_batch, train_types_batch, train_gts_batch, train_syntactic_batch = [], [], [], []
