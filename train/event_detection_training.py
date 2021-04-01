@@ -167,10 +167,19 @@ def train_trigger_extraction(repr_lr=2e-5, tem_lr = 1e-4, epoch=20, epoch_save_c
                     # start, end = start_logits.argmax(dim=0), end_logits.argmax(dim=0)
                     result_spans = argument_span_determination(binary_starts, binary_ends, start_logits, end_logits)
                     cur_span = set(map(lambda x: (x[0], x[1] - 1), spans[i_val])) # {(start, end), ...}
+                    sorted_cur_span = list(cur_span)
+                    sorted_cur_span.sort()
                     result_spans_set = set(map(tuple, result_spans))
+                    sorted_result_span = list(result_spans_set)
+                    sorted_result_span.sort()
                     total += len(cur_span)
                     predict += len(result_spans_set)
                     correct += len(cur_span.intersection(result_spans_set))
+                    if cur_span != result_spans_set:
+                        pass
+                        #print('original sentence:', send_tokens)
+                        #print('gt spans:', sorted_cur_span, '\n',  list(send_tokens[x[0] + 1: x[1] + 2] for x in sorted_cur_span))
+                        #print('result spans:', sorted_result_span, '\n', list(send_tokens[x[0] + 1: x[1] + 2] for x in sorted_result_span))
                 recall = correct / total if total != 0 else 0
                 precision = correct / predict if predict != 0 else 0
                 f_measure = (2 * recall * precision) / (recall + precision) if recall + precision != 0 else 0
