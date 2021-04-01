@@ -4,7 +4,7 @@ import torch.nn.functional as F
 
 
 class ConditionalLayerNormalization(nn.Module):
-    def __init__(self, hidden_size, eps=1e-5, pass_layer_norm=False):
+    def __init__(self, hidden_size, eps=1e-15, pass_layer_norm=False):
         """
 
         :param hidden_size:
