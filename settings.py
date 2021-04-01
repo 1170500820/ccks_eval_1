@@ -3,10 +3,13 @@
 
 # Path
 train_file_path = 'data/train_base.json'
+test_file_path = 'data/dev_base.json'
+train_trans_file_path = 'data/trans_train.json'
+test_trans_file_path = 'data/trans_dev.json'
 # model_path = '../RoBERTa_zh_Large_PyTorch'
-# model_path = 'bert-base-chinese'
-# model_path = 'hfl/BERT-wwm'
-model_path = 'hfl/BERT-wwm-ext'
+model_path = 'bert-base-chinese'
+# model_path = '../chinese_wwm_pytorch'
+# model_path = '../chinese_wwm_ext_pytorch'
 
 # Data Definitions
 role_types = [
@@ -149,3 +152,9 @@ sentence_representation_bsz = 4
 train_val_split_ratio = 0.9
 event_detection_theshold = 0.5
 trigger_extraction_threshold = 0.5
+
+
+# continue pre train
+truncation_length = 255
+replace_word_select_ratio = 0.9 # 选择词频前多少的词进行mask替换
+mlm_bsz = 4
