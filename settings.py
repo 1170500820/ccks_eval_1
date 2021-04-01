@@ -4,7 +4,9 @@
 # Path
 train_file_path = 'data/train_base.json'
 # model_path = '../RoBERTa_zh_Large_PyTorch'
-model_path = 'bert-base-chinese'
+# model_path = 'bert-base-chinese'
+# model_path = 'hfl/BERT-wwm'
+model_path = 'hfl/BERT-wwm-ext'
 
 # Data Definitions
 role_types = [
