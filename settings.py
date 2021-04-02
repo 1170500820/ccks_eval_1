@@ -158,3 +158,4 @@ trigger_extraction_threshold = 0.5
 truncation_length = 255
 replace_word_select_ratio = 0.9 # 选择词频前多少的词进行mask替换
 mlm_bsz = 4
+batch_mult_cnt = 4  # 每多少次求一次loss，相当于将bsz增大了多少倍
