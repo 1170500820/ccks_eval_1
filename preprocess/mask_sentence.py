@@ -165,5 +165,5 @@ for i, b in enumerate(origin_tokens):
         masked_ids.append(padded_masked_ids)
         temp_input_ids, temp_token_type_ids, temp_attention_masks, temp_masked = [], [], [], []
 
-pickle.dump([masked_ids, temp_token_type_ids, temp_attention_masks, input_idss], open('train_data_for_mlm.pk', 'wb'))
+pickle.dump([masked_ids, token_type_idss, attention_masks, input_idss], open('train_data_for_mlm.pk', 'wb'))
 
