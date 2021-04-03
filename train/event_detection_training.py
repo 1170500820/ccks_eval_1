@@ -88,22 +88,27 @@ def train_event_detection(lr=3e-5, epoch=20, epoch_save_cnt=3, val=True, val_fre
                 model.train()
 
 
-def train_trigger_extraction(repr_lr=2e-5, tem_lr = 1e-4, epoch=20, epoch_save_cnt=3, val=True, val_freq=300):
-    config = BertConfig.from_pretrained(model_path)
-    tokenizer = BertTokenizer.from_pretrained(model_path)
+def train_trigger_extraction(repr_lr=2e-5, tem_lr = 1e-4, epoch=20, epoch_save_cnt=3, val=True, val_freq=300, val_start_epoch=-1):
+    config = BertConfig.from_pretrained('../' + model_path)
+    tokenizer = BertTokenizer.from_pretrained('../' + model_path)
 
     # define models and optimizers
-    repr_model = SentenceRepresentation(model_path, config.hidden_size, pass_cln=False)
-    tem = TriggerExtractionModel(n_head, config.hidden_size, d_head, config.hidden_dropout_prob, ltp_feature_cnt_fixed, pass_attn=False, pass_syn=False)
+    repr_model = SentenceRepresentation('../' + model_path, config.hidden_size, pass_cln=False)
     optimizer_repr_plm = AdamW(repr_model.PLM.parameters(), lr=repr_lr)
     optimizer_repr_cln = AdamW(repr_model.CLN.parameters(), lr=tem_lr)
-    optimizer_tem = AdamW(tem.parameters(), lr=tem_lr)
+    tems, tem_optimizers = [], []
+    for i in range(len(event_types_init)):
+        tems.append(TriggerExtractionModel(n_head, config.hidden_size, d_head, config.hidden_dropout_prob, ltp_feature_cnt_fixed, pass_attn=False, pass_syn=False))
+        tem_optimizers.append(AdamW(tems[-1].parameters(), lr=tem_lr))
+    # tem = TriggerExtractionModel(n_head, config.hidden_size, d_head, config.hidden_dropout_prob, ltp_feature_cnt_fixed, pass_attn=False, pass_syn=False)
+    # optimizer_tem = AdamW(tem.parameters(), lr=tem_lr)
 
     # training device
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # device = torch.device('cpu')
     repr_model.to(device)
-    tem.to(device)
+    for t in tems:
+        t.to(device)
 
     # prepare data
     train_sentences_batch, train_types_batch, train_gts_batch, train_syntactic_batch = \
@@ -112,9 +117,12 @@ def train_trigger_extraction(repr_lr=2e-5, tem_lr = 1e-4, epoch=20, epoch_save_c
     #     train_sentences_batch[3:], train_types_batch[3:], train_gts_batch[3:], train_syntactic_batch[3:]
     val_sentences, val_types, spans, val_syntactic_features = \
         pickle.load(open('../val_data_for_trigger_extraction.pk', 'rb'))
+    eval_map = []
     for i_epoch in range(epoch):
         repr_model.train()
-        tem.train()
+        for t in tems:
+            t.train()
+        # tem.train()
         epoch_total_loss = 0.0
         for i_batch, batch_ in enumerate(train_sentences_batch):
             # forward
@@ -122,7 +130,9 @@ def train_trigger_extraction(repr_lr=2e-5, tem_lr = 1e-4, epoch=20, epoch_save_c
             gt_batch = train_gts_batch[i_batch]
             syn_batch = train_syntactic_batch[i_batch]
             repr_model.zero_grad()
-            tem.zero_grad()
+            for t in tems:
+                t.zero_grad()
+            # tem.zero_grad()
             h_styp = repr_model(batch_, typ_batch)
             start_logits, end_logits = tem(h_styp, syn_batch)
 
@@ -137,8 +147,9 @@ def train_trigger_extraction(repr_lr=2e-5, tem_lr = 1e-4, epoch=20, epoch_save_c
             print(f'epoch:{i_epoch + 1} batch:{i_batch + 1} loss:{loss.float()} epoch_avg_loss:{epoch_total_loss / (i_batch + 1)}')
 
             # eval
-            if (i_batch + 1) % val_freq == 0:
+            if (i_batch + 1) % val_freq == 0 and (i_epoch + 1) >= val_start_epoch:
                 print('evaluating...')
+                cur_eval_map = []
                 tem.eval()
                 repr_model.eval()
                 results = []
@@ -175,6 +186,7 @@ def train_trigger_extraction(repr_lr=2e-5, tem_lr = 1e-4, epoch=20, epoch_save_c
                     total += len(cur_span)
                     predict += len(result_spans_set)
                     correct += len(cur_span.intersection(result_spans_set))
+                    cur_eval_map.append(len(cur_span.intersection(result_spans_set)) / len(cur_span))
                     if cur_span != result_spans_set:
                         pass
                         #print('original sentence:', send_tokens)
@@ -184,8 +196,10 @@ def train_trigger_extraction(repr_lr=2e-5, tem_lr = 1e-4, epoch=20, epoch_save_c
                 precision = correct / predict if predict != 0 else 0
                 f_measure = (2 * recall * precision) / (recall + precision) if recall + precision != 0 else 0
                 print(f'total:{total} predict:{predict}, correct:{correct}, precision:{precision}, recall:{recall}, f:{f_measure}')
+                eval_map.append(cur_eval_map)
                 tem.train()
                 repr_model.train()
+        pickle.dump(eval_map, open(f'eval_map_{i_epoch + 1}.pk', 'wb'))
 
 
 if __name__ == '__main__':
