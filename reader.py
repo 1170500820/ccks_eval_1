@@ -16,6 +16,65 @@ def read_file(filepath=train_file_path):
     return list(map(json.loads, open(filepath, 'r', encoding='utf-8').read().strip().split('\n')))
 
 
+def simple_batchify(train_sentences, train_types, gts, train_syntactic_features):
+    train_sentences_batch, train_types_batch, train_gts_batch, train_syntactic_batch = [], [], [], []
+    temp_sent, temp_typ, temp_gt_starts, temp_gt_ends, temp_syntactic_segment, temp_syntactic_postag, temp_syntactic_ner\
+        = [], [], [], [], [], [], []
+    temp_synctactic_l, temp_syntactic_combine = [], []
+    for i, sentence in enumerate(train_sentences):
+        temp_sent.append(sentence)
+        temp_typ.append(train_types[i])
+        temp_gt_starts.append(gts[i][0])
+        temp_gt_ends.append(gts[i][1])
+        temp_syntactic_segment.append(train_syntactic_features[i][0])
+        temp_syntactic_postag.append(train_syntactic_features[i][1])
+        temp_syntactic_ner.append(train_syntactic_features[i][2])
+        temp_synctactic_l.append(temp_syntactic_segment[-1].size()[0])
+        if len(temp_sent) % sentence_representation_bsz == 0:
+            train_sentences_batch.append(temp_sent)
+            train_types_batch.append(temp_typ)
+            # batchify tensors is different
+            # pad zero to align them
+            max_l = max(list(map(len, temp_gt_starts)))
+            for k in range(len(temp_gt_starts)):
+                temp_gt_starts[k] = F.pad(temp_gt_starts[k], [0, max_l - len(temp_gt_starts[k])])
+                temp_gt_ends[k] = F.pad(temp_gt_ends[k], [0, max_l - len(temp_gt_ends[k])])
+            gt_starts, gt_ends = torch.stack(temp_gt_starts), torch.stack(temp_gt_ends)
+            train_gts_batch.append([gt_starts, gt_ends])  # both (bsz, seq_l)
+            # pad syntactic features
+            #   pad [0] on segment feature, and pad [[0, 0, ..., 1], ] on postag and ner
+            max_l = max(temp_synctactic_l)
+            for s_i in range(len(temp_syntactic_segment)):
+                pad_l = max_l - temp_syntactic_segment[s_i].size()[0]
+                if pad_l == 0:
+                    continue
+                pad_tensor = torch.zeros(pad_l, 1)
+                temp_syntactic_segment[s_i] = torch.cat((temp_syntactic_segment[s_i], pad_tensor))  # all (max_l, 1)
+            for s_i in range(len(temp_syntactic_postag)):
+                pad_l = max_l - temp_syntactic_postag[s_i].size()[0]
+                if pad_l == 0:
+                    continue
+                pad_tensor = torch.cat([torch.zeros(pad_l, postag_feature_cnt), torch.ones(pad_l, 1)], dim=1)
+                temp_syntactic_postag[s_i] = torch.cat((temp_syntactic_postag[s_i], pad_tensor))    # all (max_l, pos_cnt)
+            for s_i in range(len(temp_syntactic_ner)):
+                pad_l = max_l - temp_syntactic_ner[s_i].size()[0]
+                if pad_l == 0:
+                    continue
+                pad_tensor = torch.cat([torch.zeros(pad_l, ner_feature_cnt), torch.ones(pad_l, 1)], dim=1)
+                temp_syntactic_ner[s_i] = torch.cat((temp_syntactic_ner[s_i], pad_tensor))  # all (max_l, ner_cnt)
+            # combine syntactic features for each sentence
+            for c_i in range(len(temp_syntactic_segment)):
+                seg, pos, ner = temp_syntactic_segment[c_i], temp_syntactic_postag[c_i], temp_syntactic_ner[c_i]
+                temp_syntactic_combine.append(torch.cat([seg, pos, ner], dim=1))
+            train_syntactic_batch.append(torch.stack(temp_syntactic_combine))
+            temp_sent, temp_typ, temp_gt_starts, temp_gt_ends, temp_syntactic_segment, temp_syntactic_postag, \
+            temp_syntactic_ner = [], [], [], [], [], [], []
+            temp_synctactic_l = []
+            temp_syntactic_combine = []
+
+    return train_sentences_batch, train_types_batch, train_gts_batch, train_syntactic_batch
+
+
 def event_detection_reader():
     data = read_file()
     random.shuffle(data)
@@ -144,61 +203,32 @@ def trigger_extraction_reader():
             token_start, token_end = origin2token[trigger_start] - 1, origin2token[trigger_end - 1] - 1
             start_tensor[token_start], end_tensor[token_end] = 1, 1
         gts.append([start_tensor, end_tensor])
-    #   simple batchify
+
+    # split by event types:
     train_sentences_batch, train_types_batch, train_gts_batch, train_syntactic_batch = [], [], [], []
-    temp_sent, temp_typ, temp_gt_starts, temp_gt_ends, temp_syntactic_segment, temp_syntactic_postag, temp_syntactic_ner\
-        = [], [], [], [], [], [], []
-    temp_synctactic_l, temp_syntactic_combine = [], []
-    for i, sentence in enumerate(train_sentences):
-        temp_sent.append(sentence)
-        temp_typ.append(train_types[i])
-        temp_gt_starts.append(gts[i][0])
-        temp_gt_ends.append(gts[i][1])
-        temp_syntactic_segment.append(train_syntactic_features[i][0])
-        temp_syntactic_postag.append(train_syntactic_features[i][1])
-        temp_syntactic_ner.append(train_syntactic_features[i][2])
-        temp_synctactic_l.append(temp_syntactic_segment[-1].size()[0])
-        if len(temp_sent) % sentence_representation_bsz == 0:
-            train_sentences_batch.append(temp_sent)
-            train_types_batch.append(temp_typ)
-            # batchify tensors is different
-            # pad zero to align them
-            max_l = max(list(map(len, temp_gt_starts)))
-            for k in range(len(temp_gt_starts)):
-                temp_gt_starts[k] = F.pad(temp_gt_starts[k], [0, max_l - len(temp_gt_starts[k])])
-                temp_gt_ends[k] = F.pad(temp_gt_ends[k], [0, max_l - len(temp_gt_ends[k])])
-            gt_starts, gt_ends = torch.stack(temp_gt_starts), torch.stack(temp_gt_ends)
-            train_gts_batch.append([gt_starts, gt_ends])  # both (bsz, seq_l)
-            # pad syntactic features
-            #   pad [0] on segment feature, and pad [[0, 0, ..., 1], ] on postag and ner
-            max_l = max(temp_synctactic_l)
-            for s_i in range(len(temp_syntactic_segment)):
-                pad_l = max_l - temp_syntactic_segment[s_i].size()[0]
-                if pad_l == 0:
-                    continue
-                pad_tensor = torch.zeros(pad_l, 1)
-                temp_syntactic_segment[s_i] = torch.cat((temp_syntactic_segment[s_i], pad_tensor))  # all (max_l, 1)
-            for s_i in range(len(temp_syntactic_postag)):
-                pad_l = max_l - temp_syntactic_postag[s_i].size()[0]
-                if pad_l == 0:
-                    continue
-                pad_tensor = torch.cat([torch.zeros(pad_l, postag_feature_cnt), torch.ones(pad_l, 1)], dim=1)
-                temp_syntactic_postag[s_i] = torch.cat((temp_syntactic_postag[s_i], pad_tensor))    # all (max_l, pos_cnt)
-            for s_i in range(len(temp_syntactic_ner)):
-                pad_l = max_l - temp_syntactic_ner[s_i].size()[0]
-                if pad_l == 0:
-                    continue
-                pad_tensor = torch.cat([torch.zeros(pad_l, ner_feature_cnt), torch.ones(pad_l, 1)], dim=1)
-                temp_syntactic_ner[s_i] = torch.cat((temp_syntactic_ner[s_i], pad_tensor))  # all (max_l, ner_cnt)
-            # combine syntactic features for each sentence
-            for c_i in range(len(temp_syntactic_segment)):
-                seg, pos, ner = temp_syntactic_segment[c_i], temp_syntactic_postag[c_i], temp_syntactic_ner[c_i]
-                temp_syntactic_combine.append(torch.cat([seg, pos, ner], dim=1))
-            train_syntactic_batch.append(torch.stack(temp_syntactic_combine))
-            temp_sent, temp_typ, temp_gt_starts, temp_gt_ends, temp_syntactic_segment, temp_syntactic_postag, \
-            temp_syntactic_ner = [], [], [], [], [], [], []
-            temp_synctactic_l = []
-            temp_syntactic_combine = []
+    for t in event_types_init:
+        event_train_sentences, event_train_types, event_gts, event_train_syntactic_features = [], [], [], []
+        for i, cur_t in enumerate(train_types):
+            if cur_t == t:
+                event_train_sentences.append(train_sentences[i])
+                event_train_types.append(train_types[i])
+                event_gts.append(gts[i])
+                event_train_syntactic_features.append(train_syntactic_features[i])
+        temp_train_sentences_batch, temp_train_types_batch, temp_train_gts_batch, temp_train_syntactic_batch = simple_batchify(event_train_sentences, event_train_types, event_gts, event_train_syntactic_features)
+        train_sentences_batch += temp_train_sentences_batch
+        train_types_batch += temp_train_types_batch
+        train_gts_batch += temp_train_gts_batch
+        train_syntactic_batch += temp_train_syntactic_batch
+
+    # randomize again
+    zipped = list(zip(train_sentences_batch, train_types_batch, train_gts_batch, train_syntactic_batch))
+    random.shuffle(zipped)
+    train_sentences_batch, train_types_batch, train_gts_batch, train_syntactic_batch = zip(*zipped)
+    # 经过split与randomize， 现在每个batch中的事件类型均相等
+
+    #   simple batchify
+    # train_sentences_batch, train_types_batch, train_gts_batch, train_syntactic_batch = simple_batchify(train_sentences, train_types, gts, train_syntactic_features)
+
     #   produce [[str, ], ] [[str, ], ] [[[tensor, tensor], ], ]
     pickle.dump([train_sentences_batch, train_types_batch, train_gts_batch, train_syntactic_batch],
                 open('train_data_for_trigger_extraction.pk', 'wb'))
