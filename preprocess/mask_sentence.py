@@ -13,6 +13,7 @@ from transformers import BertTokenizer
 import random
 import pickle
 import torch
+from pyltp import SentenceSplitter
 
 
 def read_file(filepath=train_file_path):
@@ -45,7 +46,7 @@ def length_count(sents: [str, ]):
     """
     统计句子的长度分布
     :param sents:
-    :return: {length: cnt, ...}
+    :return: [(length1, freq1), (length2, freq2), ...] sorted
     """
     length_dic = {}
     for s in sents:
@@ -54,7 +55,11 @@ def length_count(sents: [str, ]):
             length_dic[l] = length_dic[l] + 1
         else:
             length_dic[l] = 2
-    return length_dic
+    length_lst = []
+    for (key, value) in length_dic.items():
+        length_lst.append((key, value))
+    length_lst.sort()
+    return length_lst
 
 
 def word_count(sents:[str, ]):
@@ -112,7 +117,7 @@ def perform_mask(original_ids: [int, ], replace_id: [int, ]):
         else:
             if random.random() <= 0.8:
                 w_lst.append(mask)
-            elif random.random() <= 0.9:
+            elif random.random() <= 0.5:
                 w_lst.append(token)
             else:
                 w_lst.append(random.sample(replace_id, 1)[0])
@@ -120,50 +125,55 @@ def perform_mask(original_ids: [int, ], replace_id: [int, ]):
     return w_lst
 
 
-# 初始化一个tokenizer
-tokenizer = BertTokenizer.from_pretrained(model_path)
+if __name__ == '__main__':
+    # 初始化一个tokenizer
+    tokenizer = BertTokenizer.from_pretrained('../' + model_path)
+    # 分句
+    splitter = SentenceSplitter()
 
-# 读取句子并过滤过长的句子
-sentences = gather_ccks_data()
-sentences = list(filter(lambda x: len(x) <= truncation_length, sentences))
+    # 读取句子并过滤过长的句子
+    sentences = gather_ccks_data()
+    sentences = list(filter(lambda x: len(x) <= truncation_length, sentences))
+    splitted_sentences = list(map(lambda x: list(splitter.split(x)), sentences))
+    splitt_cnt = length_count(splitted_sentences)
 
-# 获得替换词
-wlst = word_count(sentences)
-replace_words = get_replace_words(wlst)
-delete_lst = [100, 102, 101]    # 替换词不能为unk, sep, cls
-replace_ids = list(filter(lambda x: x not in delete_lst, tokenizer.convert_tokens_to_ids(replace_words)))
-origin_tokens, masked_tokens = [], []
-for sent in sentences:
-    result = tokenizer(sent)
-    ids = result.data['input_ids']
-    masked = perform_mask(ids, replace_ids)
-    origin_tokens.append(result)
-    masked_tokens.append(masked)
-
-# randomize
-zipped = list(zip(origin_tokens, masked_tokens))
-random.shuffle(zipped)
-origin_tokens, masked_tokens = zip(*zipped)
-
-# batchify
-input_idss, token_type_idss, attention_masks, masked_ids = [], [], [], []
-temp_input_ids, temp_token_type_ids, temp_attention_masks, temp_masked = [], [], [], []
-for i, b in enumerate(origin_tokens):
-    m = masked_tokens[i]
-    temp_input_ids.append(torch.tensor(b.data['input_ids']))
-    temp_token_type_ids.append(torch.tensor(b.data['token_type_ids']))
-    temp_attention_masks.append(torch.tensor(b.data['attention_mask']))
-    temp_masked.append(torch.tensor(m))
-    if len(temp_masked) % mlm_bsz == 0:
-        padded_input_ids = torch.nn.utils.rnn.pad_sequence(temp_input_ids, batch_first=True)
-        padded_token_type_ids = torch.nn.utils.rnn.pad_sequence(temp_token_type_ids, batch_first=True)
-        padded_attention_masks = torch.nn.utils.rnn.pad_sequence(temp_attention_masks, batch_first=True)
-        padded_masked_ids = torch.nn.utils.rnn.pad_sequence(temp_masked, batch_first=True)
-        input_idss.append(padded_input_ids)
-        token_type_idss.append(padded_token_type_ids)
-        attention_masks.append(padded_attention_masks)
-        masked_ids.append(padded_masked_ids)
-        temp_input_ids, temp_token_type_ids, temp_attention_masks, temp_masked = [], [], [], []
-
-pickle.dump([masked_ids, token_type_idss, attention_masks, input_idss], open('train_data_for_mlm.pk', 'wb'))
-
+    # # 获得替换词
+    # wlst = word_count(sentences)
+    # replace_words = get_replace_words(wlst)
+    # delete_lst = [100, 102, 101]    # 替换词不能为unk, sep, cls
+    # replace_ids = list(filter(lambda x: x not in delete_lst, tokenizer.convert_tokens_to_ids(replace_words)))
+    # origin_tokens, masked_tokens = [], []
+    # for sent in sentences:
+    #     result = tokenizer(sent)
+    #     ids = result.data['input_ids']
+    #     masked = perform_mask(ids, replace_ids)
+    #     origin_tokens.append(result)
+    #     masked_tokens.append(masked)
+    #
+    # # randomize
+    # zipped = list(zip(origin_tokens, masked_tokens))
+    # random.shuffle(zipped)
+    # origin_tokens, masked_tokens = zip(*zipped)
+    #
+    # # batchify
+    # input_idss, token_type_idss, attention_masks, masked_ids = [], [], [], []
+    # temp_input_ids, temp_token_type_ids, temp_attention_masks, temp_masked = [], [], [], []
+    # for i, b in enumerate(origin_tokens):
+    #     m = masked_tokens[i]
+    #     temp_input_ids.append(torch.tensor(b.data['input_ids']))
+    #     temp_token_type_ids.append(torch.tensor(b.data['token_type_ids']))
+    #     temp_attention_masks.append(torch.tensor(b.data['attention_mask']))
+    #     temp_masked.append(torch.tensor(m))
+    #     if len(temp_masked) % mlm_bsz == 0:
+    #         padded_input_ids = torch.nn.utils.rnn.pad_sequence(temp_input_ids, batch_first=True)
+    #         padded_token_type_ids = torch.nn.utils.rnn.pad_sequence(temp_token_type_ids, batch_first=True)
+    #         padded_attention_masks = torch.nn.utils.rnn.pad_sequence(temp_attention_masks, batch_first=True)
+    #         padded_masked_ids = torch.nn.utils.rnn.pad_sequence(temp_masked, batch_first=True)
+    #         input_idss.append(padded_input_ids)
+    #         token_type_idss.append(padded_token_type_ids)
+    #         attention_masks.append(padded_attention_masks)
+    #         masked_ids.append(padded_masked_ids)
+    #         temp_input_ids, temp_token_type_ids, temp_attention_masks, temp_masked = [], [], [], []
+    #
+    # pickle.dump([masked_ids, token_type_idss, attention_masks, input_idss], open('train_data_for_mlm.pk', 'wb'))
+    #
