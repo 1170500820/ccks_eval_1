@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from .self_attentions import SelfAttn
 
 
 class TriggerExtractionModel(nn.Module):
@@ -24,19 +25,7 @@ class TriggerExtractionModel(nn.Module):
         self.pass_attn = pass_attn
         self.pass_syn = pass_syn
 
-        # W_q, W_k and W_v
-        self.q_net = nn.Linear(self.hidden_size, self.num_heads * self.d_head, bias=False)
-        self.kv_net = nn.Linear(self.hidden_size, 2 * self.num_heads * self.d_head, bias=False)
-        self.scale = 1 / self.d_head ** 0.5
-
-        # Dropout layer
-        self.dropout = nn.Dropout(self.dropout_prob)
-
-        # todo whats this?
-        self.dropout_att = nn.Dropout(self.dropout_prob)
-
-        # O matrix to combine O of multiple heads
-        self.o_net = nn.Linear(self.num_heads * self.d_head, self.hidden_size, bias=False)
+        self.self_attn = SelfAttn(self.num_heads, self.d_head, self.hidden_size, self.dropout_prob)
 
         # FCN for trigger finding
         self.fcn_start = nn.Linear(self.hidden_size * 2 + self.syntactic_size, 1)
@@ -62,25 +51,7 @@ class TriggerExtractionModel(nn.Module):
         :return:
         """
         # self attention (multihead attention)
-        #   get q,k,v
-        head_q = self.q_net(cln_embeds) # (bsz, seq_l, num_heads * d_head)
-        head_k, head_v = torch.chunk(self.kv_net(cln_embeds), 2, -1)    # both (bsz, seq_l, num_heads * d_head)
-        #   todo 这里是在干什么？
-        #   turn q, k, v's sizes into (bsz, seq_l, num_heads, d_head)
-        head_q = head_q.view(cln_embeds.size(0), cln_embeds.size(1), self.num_heads, self.d_head)
-        head_k = head_k.view(cln_embeds.size(0), cln_embeds.size(1), self.num_heads, self.d_head)
-        head_v = head_v.view(cln_embeds.size(0), cln_embeds.size(1), self.num_heads, self.d_head)
-        attn_score = torch.einsum('bind,bjnd->ijbn', head_q, head_k)    # got (seq_l_i, seq_l_j, bsz, num_heads)
-        attn_score.mul_(self.scale)
-        #   softmax on j dimension
-        attn_prob = F.softmax(attn_score, dim=1)
-        attn_prob = self.dropout_att(attn_prob) # 可选的dropout？
-        #   O cal
-        attn_vec = torch.einsum('ijbn,bjnd->bind', attn_prob, head_v)   # got (bsz, seq_l_i, num_heads, d_head)
-        attn_vec = attn_vec.contiguous().view(attn_vec.size(0), attn_vec.size(1), self.num_heads * self.d_head)
-        #   final projection
-        attn_out = self.o_net(attn_vec)
-        attn_out = self.dropout(attn_out)   # 有一个dropout
+        attn_out = self.self_attn(cln_embeds)
 
         # concatenation
         # print('cln',  cln_embeds.size())
