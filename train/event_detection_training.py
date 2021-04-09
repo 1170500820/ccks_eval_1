@@ -89,6 +89,8 @@ def train_event_detection(lr=3e-5, epoch=20, epoch_save_cnt=3, val=True, val_fre
 
 
 def train_trigger_extraction(repr_lr=2e-5, tem_lr = 1e-4, epoch=20, epoch_save_cnt=3, val=True, val_freq=300, val_start_epoch=-1):
+    # Training Procedure Step - 1
+    # Initiate model, model config, tokenizer, optimizer. Move models to devices
     config = BertConfig.from_pretrained('../' + model_path)
     tokenizer = BertTokenizer.from_pretrained('../' + model_path)
 
@@ -110,7 +112,9 @@ def train_trigger_extraction(repr_lr=2e-5, tem_lr = 1e-4, epoch=20, epoch_save_c
     for t in tems:
         t.to(device)
 
-    # prepare data
+    # Training Procedure Step - 2
+    # Prepare train and evaluate data (as batch)
+    #   Both train and evaluate data should be iterable, every single data contains batch and necessary information
     train_sentences_batch, train_types_batch, train_gts_batch, train_syntactic_batch = \
         pickle.load(open('../train_data_for_trigger_extraction.pk', 'rb'))
     # train_sentences_batch, train_types_batch, train_gts_batch, train_syntactic_batch = \
@@ -118,15 +122,24 @@ def train_trigger_extraction(repr_lr=2e-5, tem_lr = 1e-4, epoch=20, epoch_save_c
     val_sentences, val_types, spans, val_syntactic_features = \
         pickle.load(open('../val_data_for_trigger_extraction.pk', 'rb'))
     eval_map = []
+
+    # Training Procedure Step - 3
+    # Start the training loop
     for i_epoch in range(epoch):
+        # Step 3.1
+        # Set model to train model before the epoch loop
         repr_model.train()
         for t in tems:
             t.train()
         # tem.train()
         epoch_total_loss = 0.0
         for i_batch, batch_ in enumerate(train_sentences_batch):
+            # Step 3.1.1
+            # Send the data into the model. run model.zero_grad() before sending the data
             # forward
             typ_batch = train_types_batch[i_batch]
+            cur_type = typ_batch[0]
+            cur_type_idx = event_types_init_index[cur_type]
             gt_batch = train_gts_batch[i_batch]
             syn_batch = train_syntactic_batch[i_batch]
             repr_model.zero_grad()
@@ -134,36 +147,51 @@ def train_trigger_extraction(repr_lr=2e-5, tem_lr = 1e-4, epoch=20, epoch_save_c
                 t.zero_grad()
             # tem.zero_grad()
             h_styp = repr_model(batch_, typ_batch)
-            start_logits, end_logits = tem(h_styp, syn_batch)
+            start_logits, end_logits = tems[cur_type_idx](h_styp, syn_batch)
 
-            # compute loss and backward
+            # Step 3.1.2
+            # Compute loss and backward
             loss = F.binary_cross_entropy(start_logits, gt_batch[0].cuda()) + F.binary_cross_entropy(end_logits, gt_batch[1].cuda())
             loss.backward()
             optimizer_repr_plm.step()
             optimizer_repr_cln.step()
-            optimizer_tem.step()
+            tem_optimizers[cur_type_idx].step()
             epoch_total_loss += loss.float()
 
+            # Step 3.1.3
+            # print train information
             print(f'epoch:{i_epoch + 1} batch:{i_batch + 1} loss:{loss.float()} epoch_avg_loss:{epoch_total_loss / (i_batch + 1)}')
 
-            # eval
+            # Extra Step
+            # Evaluation
+            # Evaluation during training is convenience, because we dont have to repeat Step 1-2
             if (i_batch + 1) % val_freq == 0 and (i_epoch + 1) >= val_start_epoch:
+                # Extra Step 1
+                # Step 1-2 and run model.eval() for all models
                 print('evaluating...')
                 cur_eval_map = []
-                tem.eval()
+                for t in tems:
+                    t.eval()
                 repr_model.eval()
                 results = []
 
+                # Extra Step 2
+                # Prepare the statistical variables
                 total = 0
                 predict = 0
                 correct = 0
                 left_part_correct = 0
                 right_part_correct = 0
                 word_correct = 0
+
+                # Extra Step 3
+                # Start the evaluating loop,
                 for i_val, val_sent in list(enumerate(val_sentences)):
                     send_tokens = tokenizer.convert_ids_to_tokens(tokenizer(val_sent)['input_ids'])
+                    cur_type_eval = val_types[i_val]
+                    cur_type_idx_eval = event_types_init_index[cur_type_eval]
                     val_h_styp = repr_model(val_sent, val_types[i_val])
-                    start_logits, end_logits = tem(val_h_styp, val_syntactic_features[i_val])   # both (1, seq_l)
+                    start_logits, end_logits = tems[cur_type_idx_eval](val_h_styp, val_syntactic_features[i_val])   # both (1, seq_l)
                     # print('starts:', start_logits)
                     # print('start\'s size:', start_logits.size())
                     # print('ends:', end_logits)
@@ -197,7 +225,9 @@ def train_trigger_extraction(repr_lr=2e-5, tem_lr = 1e-4, epoch=20, epoch_save_c
                 f_measure = (2 * recall * precision) / (recall + precision) if recall + precision != 0 else 0
                 print(f'total:{total} predict:{predict}, correct:{correct}, precision:{precision}, recall:{recall}, f:{f_measure}')
                 eval_map.append(cur_eval_map)
-                tem.train()
+                # tem.train()
+                for t in tems:
+                    t.train()
                 repr_model.train()
         pickle.dump(eval_map, open(f'eval_map_{i_epoch + 1}.pk', 'wb'))
 

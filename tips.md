@@ -20,5 +20,19 @@
 
 dict的list还是比较省空间的方案，每一个句子都创建一个对象还更难序列化，内存又大。
 
+记录一下，使用bert-base-chinese，
+
+
+不加cln:
+    e1b300:total:469 correct:350, precision:0.746268656716418
+    e2b300:total:469 correct:363, precision:0.7739872068230277
+    e3b300:total:469 correct:359, precision:0.7654584221748401
+加入cln:
+    e1b300:total:469 correct:364, precision:0.7761194029850746
+    e2b300:total:469 correct:350, precision:0.746268656716418
+    e3b300:total:469 correct:361, precision:0.7697228144989339
+
+似乎并没有看到显著的效果提升。
+    
 
 

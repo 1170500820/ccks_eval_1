@@ -3,7 +3,7 @@ import numpy as np
 import pickle
 import numpy as np
 
-data = pickle.load(open('../train/eval_map_9.pk', 'rb'))
+data = pickle.load(open('../train/eval_map_6.pk', 'rb'))
 data_np = np.array(data)
 
 Z = np.random.rand(6, 10)

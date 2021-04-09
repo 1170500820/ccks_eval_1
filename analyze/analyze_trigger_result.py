@@ -1,7 +1,7 @@
 import pickle
 import numpy as np
 
-data = pickle.load(open('../train/eval_map_9.pk', 'rb'))
+data = pickle.load(open('../train/single_tem/eval_map_6.pk', 'rb'))
 val_sentences, val_types, spans, val_syntactic_features = \
         pickle.load(open('../val_data_for_trigger_extraction.pk', 'rb'))
 a = np.array(data)
