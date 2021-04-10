@@ -148,6 +148,8 @@ event_detection_model = 'bert'
 
 sentence_representation_bsz = 4
 
+argument_extraction_bsz = 4
+
 
 # Eval
 train_val_split_ratio = 0.9
