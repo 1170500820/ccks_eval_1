@@ -413,7 +413,7 @@ def argument_extraction_reader():
         token_l_without_placeholder = len(token2origin) - 2
         start_tensors_lst, end_tensors_lst = [], []
         for role in role_types:
-            cur_role_start_tensor = torch.zeros(token_l_without_placeholder)
+            cur_role_start_tensor = torch.zeros(token_l_without_placeholder)    # (seq_l)
             cur_role_end_tensor = torch.zeros(token_l_without_placeholder)
             # todo 剔除不合法结构
             for arg in cur_arguments:
@@ -423,7 +423,11 @@ def argument_extraction_reader():
                     cur_role_start_tensor[token_start], cur_role_end_tensor[token_end] = 1, 1
             start_tensors_lst.append(cur_role_start_tensor)
             end_tensors_lst.append(cur_role_end_tensor)
-        gts.append([torch.stack(start_tensors_lst), torch.stack(end_tensors_lst)])
+        start_tensors, end_tensors \
+            = torch.stack(start_tensors_lst), torch.stack(end_tensors_lst)   # both (bsz, len(role_types), seq_l)
+        start_tensors, end_tensors \
+            = start_tensors.permute([0, 2, 1]), end_tensors.permute([0, 2, 1])   # both (bsz, seq_l, len(role_types))
+        gts.append([start_tensors, end_tensors])  # [(bsz, seq_l, len(role_types)), ~]
 
     # Step 5
     # Batchify
