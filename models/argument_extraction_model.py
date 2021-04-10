@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from .self_attentions import SelfAttn
+from settings import role_types
 
 
 class ArgumentExtractionModel(nn.Module):
@@ -31,8 +32,8 @@ class ArgumentExtractionModel(nn.Module):
 
         # FCN for trigger finding
         # origin + attn(origin) + syntactic + RPE
-        self.fcn_start = nn.Linear(self.hidden_size * 2 + self.syntactic_size + 1, 1)
-        self.fcn_end = nn.Linear(self.hidden_size * 2 + self.syntactic_size + 1, 1)
+        self.fcn_start = nn.Linear(self.hidden_size * 2 + self.syntactic_size + 1, len(role_types))
+        self.fcn_end = nn.Linear(self.hidden_size * 2 + self.syntactic_size + 1, len(role_types))
 
         self.init_weights()
 
@@ -55,3 +56,7 @@ class ArgumentExtractionModel(nn.Module):
         if self.skip_RPE:
             relative_positional_encoding = torch.zeros(relative_positional_encoding.size()).cuda()
         final_repr = torch.cat((cln_embeds, attn_out, syntactic_structure, relative_positional_encoding), dim=-1)
+
+        start_logits, end_logits = self.fcn_start(final_repr), self.fcn_end(final_repr) # (bsz, seq_l, len(role_types))
+        starts, ends = F.sigmoid(start_logits), F.sigmoid(end_logits)   # (bsz, seq_l, len(role_types))
+        return starts, ends
