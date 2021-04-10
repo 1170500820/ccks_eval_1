@@ -74,3 +74,29 @@ class SentenceTypeConcatenation(nn.Module):
         """
         return self.tokenizer(sentence_type, sentence, padding=True, truncation=True, return_tensors='pt')
 
+
+class TriggeredSentenceRepresentation(nn.Module):
+    def __init__(self, hidden_size, pass_cln=False):
+        super(TriggeredSentenceRepresentation, self).__init__()
+        self.hidden_size = hidden_size
+        self.CLN = ConditionalLayerNormalization(hidden_size, pass_layer_norm=pass_cln)
+
+    def forward(self, embeds, trigger_spans):
+        """
+
+        :param embeds: (bsz, seq_l, hidden) without <CLS> and <SEP>
+        :param trigger_spans: [(int, int), ...], start与end都在trigger内，一个是内左，一个是内右
+        :return:
+        """
+        bsz = len(trigger_spans)
+        H_cs, H_ss = [], []
+        seq_ls = []
+        for s in range(bsz):
+            cur_span = trigger_spans[s]
+            cur_H_c = embeds[s][cur_span[0]:cur_span[1] + 1]
+            pooled_cur_H_c = torch.div(torch.sum(cur_H_c, dim=0), cur_H_c.size(0)).unsqueeze(dim=0) # (1, hidden)
+            H_cs.append(cur_H_c)
+            H_ss.append(embeds[s])
+        H_styp = self.CLN(torch.stack(H_ss), torch.stack(H_cs))
+        # todo 还需要生成relative positional embeddings
+        return H_styp, None
