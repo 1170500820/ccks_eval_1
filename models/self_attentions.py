@@ -30,7 +30,7 @@ class SelfAttn(nn.Module):
         torch.nn.init.xavier_uniform(self.kv_net.weight)
         torch.nn.init.xavier_uniform(self.o_net.weight)
 
-    def forawrd(self, embeds):
+    def forward(self, embeds):
         """
 
         :param embeds: (bsz, seq_l, hidden_size)
@@ -52,7 +52,7 @@ class SelfAttn(nn.Module):
 
         # O
         attn_vec = torch.einsum('ijbn,bjnd->bind', attn_prob, head_v)  # (bsz, seq_l, n_head, d_head)
-        attn_vec = attn_vec.continguous().view(attn_vec.size(0), attn_vec.size(1), self.n_head * self.d_head)
+        attn_vec = attn_vec.contiguous().view(attn_vec.size(0), attn_vec.size(1), self.n_head * self.d_head)
 
         # final projection
         attn_out = self.o_net(attn_vec) # (bsz, seq_l, hidden)
