@@ -7,6 +7,7 @@ from transformers import AdamW, BertConfig
 from models.event_detection import *
 from models.sentence_representation_layer import *
 from models.trigger_extraction_model import *
+from models.argument_extraction_model import *
 from evaluate.eval_utils import *
 import torch
 import torch.nn.functional as F
@@ -230,6 +231,123 @@ def train_trigger_extraction(repr_lr=2e-5, tem_lr = 1e-4, epoch=20, epoch_save_c
                     t.train()
                 repr_model.train()
         pickle.dump(eval_map, open(f'eval_map_{i_epoch + 1}.pk', 'wb'))
+
+
+def train_argument_extraction(repr_lr=2e-5, aem_lr=1e-4, epoch=50, epoch_save_cnt=3, val=True, val_freq=1000, val_start_epoch=-1, inner_model=True):
+    """
+
+    :param repr_lr:
+    :param aem_lr:
+    :param epoch:
+    :param epoch_save_cnt:
+    :param val:
+    :param val_freq:
+    :param val_start_epoch:
+    :param inner_model: 设置为True则代表使用内置的模型例如bert-base-chinese，这种情况下就不需要加路径前缀
+    :return:
+    """
+    # Step 1
+    # Initiate model, model config, tokenizer and optimizer, Move models to devices
+    path_prefix = '../' if not inner_model else ''
+    config = BertConfig.from_pretrained(path_prefix + model_path)
+    tokenizer = BertTokenizer.from_pretrained(path_prefix + model_path)
+    #   define models and optimizers
+    repr_model = SentenceRepresentation(path_prefix + model_path, config.hidden_size, pass_cln=False)
+    trigger_repr_model = TriggeredSentenceRepresentation(config.hidden_size, pass_cln=False)
+    aem = ArgumentExtractionModel(n_head, config.hidden_size, d_head, config.hidden_dropout_prob, ltp_feature_cnt_fixed)
+    optimizer_repr_plm = AdamW(repr_model.PLM.parameters(), lr=repr_lr)
+    # optimizer_others = AdamW(list(repr_model.CLN.parameters()) + list(trigger_repr_model.parameters()) + list(aem.parameters()), lr=aem_lr)
+    optimizer_repr_cln = AdamW(repr_model.CLN.parameters(), lr=aem_lr)
+    optimizer_trigger_repr = AdamW(trigger_repr_model.parameters(), lr=aem_lr)
+    optimizer_aem = AdamW(aem.parameters(), lr=aem_lr)
+    #   devices
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    repr_model.to(device)
+    trigger_repr_model.to(device)
+    aem.to(device)
+
+    # Step 2
+    # Prepare train and evaluate data
+    train_sentences_batch, train_types_batch, train_triggers_batch, train_gts_batch, train_syntactic_batch = \
+        pickle.load(open('../train_data_for_argument_extraction.pk', 'rb'))
+    val_sentences, val_types, val_triggers, arg_spans, val_syns = \
+        pickle.load(open('../val_data_for_argument_extraction.pk', 'rb'))
+
+    # # temp
+    # start_cut, end_cut = 9, 15
+    # train_sentences_batch, train_types_batch, train_triggers_batch, train_gts_batch, train_syntactic_batch \
+    #     = train_sentences_batch[start_cut: end_cut], train_types_batch[start_cut: end_cut]\
+    #     , train_triggers_batch[start_cut: end_cut], train_gts_batch[start_cut: end_cut]\
+    #     , train_syntactic_batch[start_cut: end_cut]
+
+    # Step 3
+    # Start the training loop
+    for i_epoch in range(epoch):
+        repr_model.train()
+        trigger_repr_model.train()
+        aem.train()
+        epoch_total_loss = 0.0
+        for i_batch, batch_ in enumerate(train_sentences_batch):
+            typ_batch = train_types_batch[i_batch]
+            gt_batch = train_gts_batch[i_batch]
+            syn_batch = train_syntactic_batch[i_batch]
+            trigger_batch = train_triggers_batch[i_batch]
+            # zero grad
+            repr_model.zero_grad()
+            trigger_repr_model.zero_grad()
+            aem.zero_grad()
+
+            h_styp = repr_model(batch_, typ_batch)
+            h_styp, RPE = trigger_repr_model(h_styp, trigger_batch)
+            start_logits, end_logits = aem(h_styp, syn_batch.cuda(), RPE)  # both (bsz, seq_l, len(role_types))
+            # todo loss?
+            loss = F.binary_cross_entropy(start_logits, gt_batch[0].cuda()) + F.binary_cross_entropy(end_logits, gt_batch[1].cuda())
+            loss.backward()
+            optimizer_repr_plm.step()
+            # optimizer_others.step()
+            optimizer_repr_cln.step()
+            optimizer_trigger_repr.step()
+            optimizer_aem.step()    # 不同optimizer分别step和一个optimizer自己step，结果有区别吗
+
+            epoch_total_loss += loss.float()
+            print(f'epoch:{i_epoch + 1} batch:{i_batch + 1} loss:{loss.float()} epoch_avg_loss:{epoch_total_loss / (i_batch + 1)}')
+
+            if (i_batch + 1) % val_freq == 0 and (i_epoch + 1) >= val_start_epoch:
+                print('evaluating')
+                repr_model.eval()
+                trigger_repr_model.eval()
+                aem.eval()
+
+                total, predict, correct = 0, 0, 0
+
+                for i_val, val_sent in tqdm(list(enumerate(val_sentences))):
+                    val_type = val_types[i_val]
+                    val_trigger = val_triggers[i_val]
+                    val_syn = val_syns[i_val]
+                    val_span = arg_spans[i_val]
+
+                    h_styp = repr_model([val_sent], [val_type])
+                    h_styp, RPE = trigger_repr_model(h_styp, [val_trigger])
+                    start_logits, end_logits = aem(h_styp, val_syn.cuda(), RPE) # (1, seq_l, len(role_types))
+                    start_logits, end_logits = start_logits.squeeze().T, end_logits.squeeze().T # (len(role_types), seq_l)
+                    start_results, end_results = (start_logits > argument_extraction_threshold).long().tolist()\
+                        , (end_logits > argument_extraction_threshold).long().tolist()
+                    result_spans = []
+                    for i_span in range(len(role_types)):
+                        result_span = argument_span_determination(start_results[i_span], end_results[i_span]
+                                                                  , start_logits[i_span], end_logits[i_span])
+                        result_spans.append(result_span)
+
+                    for i_compare in range(len(role_types)):
+                        total += len(val_span[i_compare])
+                        predict += len(result_spans[i_compare])
+                        correct += len(set(map(tuple, val_span[i_compare])).intersection(set(map(tuple, result_spans[i_compare]))))
+
+                recall = correct / total if total != 0 else 0
+                precision = correct / predict if predict != 0 else 0
+                f_measure = (2 * recall * precision) / (recall + precision) if recall + precision != 0 else 0
+                print(
+                    f'total:{total} predict:{predict}, correct:{correct}, precision:{precision}, recall:{recall}, f:{f_measure}')
 
 
 if __name__ == '__main__':
