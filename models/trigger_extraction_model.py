@@ -41,7 +41,6 @@ class TriggerExtractionModel(nn.Module):
         torch.nn.init.xavier_uniform(self.q_net.weight)
         torch.nn.init.xavier_uniform(self.kv_net.weight)
         torch.nn.init.xavier_uniform(self.o_net.weight)
-        pass
 
     def forward(self, cln_embeds, syntactic_structure):
         """
