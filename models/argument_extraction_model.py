@@ -37,6 +37,12 @@ class ArgumentExtractionModel(nn.Module):
 
         self.init_weights()
 
+    def init_weights(self):
+        torch.nn.init.xavier_uniform(self.fcn_start.weight)
+        torch.nn.init.xavier_uniform(self.fcn_end.weight)
+        self.fcn_start.bias.data.fill_(0)
+        self.fcn_end.bias.data.fill_(0)
+
     def forward(self, cln_embeds, syntactic_structure, relative_positional_encoding):
         """
 
