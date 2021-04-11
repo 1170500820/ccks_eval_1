@@ -95,8 +95,20 @@ class TriggeredSentenceRepresentation(nn.Module):
             cur_span = trigger_spans[s]
             cur_H_c = embeds[s][cur_span[0]:cur_span[1] + 1]
             pooled_cur_H_c = torch.div(torch.sum(cur_H_c, dim=0), cur_H_c.size(0)).unsqueeze(dim=0) # (1, hidden)
-            H_cs.append(cur_H_c)
+            H_cs.append(pooled_cur_H_c)
             H_ss.append(embeds[s])
-        H_styp = self.CLN(torch.stack(H_ss), torch.stack(H_cs))
+        H_styp = self.CLN(torch.stack(H_ss), torch.stack(H_cs)) # (bsz, seq_l, hidden)
+        # Relative Positional Encoding
+        rpes = []
+        for s in range(bsz):
+            cur_span = trigger_spans[s]
+            rpe = torch.zeros(H_styp.size(1))   #
+            for idx in range(len(rpe)):
+                if idx <= cur_span[0]:
+                    rpe[idx] = idx - cur_span[0]
+                elif idx >= cur_span[1]:
+                    rpe[idx] = idx - cur_span[1]
+            rpes.append(rpe.unsqueeze(dim=1))   # (seq_l, 1)
+        RPE = torch.stack(rpes).cuda() # (bsz, seq_l, 1)
         # todo 还需要生成relative positional embeddings
-        return H_styp, None
+        return H_styp, RPE
