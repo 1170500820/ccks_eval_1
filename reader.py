@@ -98,10 +98,10 @@ def simple_bachify_for_arguments(train_sentences, train_types, train_trigs, gts,
             # pad zero to align them
             # each gt tensor is of size (len(role_types), seq_l), expect them to be (bsz, len(tole_types), seq_l)
             gt_starts, gt_ends \
-                = torch.nn.utils.rnn.pad_sequence(temp_gt_starts, True, 0)\
-                , torch.nn.utils.rnn.pad_sequence(temp_gt_ends, True, 0)    # (bsz, seq_l, len(role_types))
-            gt_starts, gt_ends = gt_starts.permute([0, 2, 1]), gt_ends.permute([0, 2, 1])   # (bsz, len(role_types), seq_l)
-            train_gts_batch.append([gt_starts, gt_ends])  # both (bsz, seq_l)
+                = torch.nn.utils.rnn.pad_sequence(list(map(lambda x: x.T, temp_gt_starts)), True, 0)\
+                , torch.nn.utils.rnn.pad_sequence(list(map(lambda x: x.T, temp_gt_ends)), True, 0)    # (bsz, seq_l, len(role_types))
+            # gt_starts, gt_ends = gt_starts.permute([0, 2, 1]), gt_ends.permute([0, 2, 1])   # (bsz, len(role_types), seq_l)
+            train_gts_batch.append([gt_starts, gt_ends])  # both (bsz, len(role_types), seq_l)
             # pad syntactic features
             #   pad [0] on segment feature, and pad [[0, 0, ..., 1], ] on postag and ner
             max_l = max(temp_synctactic_l)
@@ -128,8 +128,8 @@ def simple_bachify_for_arguments(train_sentences, train_types, train_trigs, gts,
                 seg, pos, ner = temp_syntactic_segment[c_i], temp_syntactic_postag[c_i], temp_syntactic_ner[c_i]
                 temp_syntactic_combine.append(torch.cat([seg, pos, ner], dim=1))
             train_syntactic_batch.append(torch.stack(temp_syntactic_combine))
-            temp_sent, temp_typ, temp_gt_starts, temp_gt_starts, temp_gt_ends, temp_syntactic_segment, temp_syntactic_postag, \
-            temp_syntactic_ner = [], [], [], [], [], [], [], []
+            temp_sent, temp_typ, temp_trigs, temp_gt_starts, temp_gt_starts, temp_gt_ends, temp_syntactic_segment, temp_syntactic_postag, \
+            temp_syntactic_ner = [], [], [], [], [], [], [], [], []
             temp_synctactic_l = []
             temp_syntactic_combine = []
 
@@ -327,6 +327,7 @@ def argument_extraction_reader():
     total_event_cnt = 0
     for i, d in enumerate(data):
         cur_match = matches[i]
+        token2origin, origin2token = cur_match
         events = d['events']
         cur_segment_tensor = segment_feature_tensors[i]
         cur_postag_tensor = postag_feature_tensors[i]
@@ -343,8 +344,10 @@ def argument_extraction_reader():
             cur_trigger = None
             args_except_trigger = []
             for mention in mentions:
+                # 由于ae的trigger是传给TrigReprModel的，所以需要先转化为token上的
+                cur_start, cur_end = mention['span']
                 if mention['role'] == 'trigger':
-                    cur_trigger = mention['span']  # [start, end]
+                    cur_trigger = (origin2token[cur_start] - 1, origin2token[cur_end - 1] - 1)  # [start, end]
                 else:
                     args_except_trigger.append(mention)
             if cur_trigger is None:  # there must be one and only one trigger in a event
@@ -374,6 +377,7 @@ def argument_extraction_reader():
     # Step 3
     # Randomize
     # 打乱7次
+    assert len(sentences) == len(types) == len(sent_match) == len(trigger) == len(arguments) == len(syntactic)
     randomize_times = 7
     for k in range(randomize_times):
         zipped = list(zip(sentences, types, sent_match, trigger, arguments, syntactic))
@@ -397,14 +401,14 @@ def argument_extraction_reader():
         = sentences[:train_cnt], types[:train_cnt], sent_match[:train_cnt]\
         , trigger[:train_cnt], arguments[:train_cnt], syntactic[:train_cnt]\
         , sentences[train_cnt:], types[train_cnt:], sent_match[train_cnt:]\
-        , trigger[train_cnt:], arguments[:train_cnt], syntactic[train_cnt:]
+        , trigger[train_cnt:], arguments[train_cnt:], syntactic[train_cnt:]
     #   Step 4.2
     #   Prepare Training Data
     gts = []
     for i, sentence in enumerate(train_sentences):
         token2origin, origin2token = train_sent_match[i]
         cur_arguments = train_arguments[i]
-        cur_trigger = train_triggers[i]
+        cur_trigger = train_triggers[i] # (start, end)
         # the data be like:
         # sent:     除 上 述 质 押 股 份 外 , 卓 众 达 富 持 有 的
         #           0  1 2 |3  4|5  6 7  8 9 10 11 12 13 14 15
@@ -424,9 +428,9 @@ def argument_extraction_reader():
             start_tensors_lst.append(cur_role_start_tensor)
             end_tensors_lst.append(cur_role_end_tensor)
         start_tensors, end_tensors \
-            = torch.stack(start_tensors_lst), torch.stack(end_tensors_lst)   # both (bsz, len(role_types), seq_l)
+            = torch.stack(start_tensors_lst), torch.stack(end_tensors_lst)   # both (len(role_types), seq_l)
         start_tensors, end_tensors \
-            = start_tensors.permute([0, 2, 1]), end_tensors.permute([0, 2, 1])   # both (bsz, seq_l, len(role_types))
+            = start_tensors.permute([1, 0]), end_tensors.permute([1, 0])   # both (seq_l, len(role_types))
         gts.append([start_tensors, end_tensors])  # [(bsz, seq_l, len(role_types)), ~]
 
     # Step 5
@@ -453,7 +457,9 @@ def argument_extraction_reader():
             cur_role_spans = []
             for arg in cur_arguments:
                 if arg['role'] == role:
-                    cur_role_spans.append(arg['span'])
+                    start_index, end_index = arg['span']
+                    # cur_role_spans.append(arg['span'])
+                    cur_role_spans.append((origin2token[start_index] - 1, origin2token[end_index - 1] - 1))
             # 检查一下合法性
             if role in event_available_roles[val_types[i]]:
                 cur_argument_spans.append(cur_role_spans)
