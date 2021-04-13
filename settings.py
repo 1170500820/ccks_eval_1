@@ -7,9 +7,9 @@ test_file_path = 'data/dev_base.json'
 train_trans_file_path = 'data/trans_train.json'
 test_trans_file_path = 'data/trans_dev.json'
 # model_path = '../RoBERTa_zh_Large_PyTorch'
-# model_path = 'bert-base-chinese'
+model_path = 'bert-base-chinese'
 # model_path = '../chinese_wwm_pytorch'
-model_path = '../chinese_wwm_ext_pytorch'
+# model_path = '../chinese_wwm_ext_pytorch'
 # model_path = '../chinese_wwm_ext_pytorch_ContTrain_epoch_1_batch_500_bsz_4'
 
 # Data Definitions
@@ -155,6 +155,7 @@ argument_extraction_bsz = 4
 train_val_split_ratio = 0.9
 event_detection_theshold = 0.5
 trigger_extraction_threshold = 0.5
+argument_extraction_threshold = 0.5
 
 
 # continue pre train
