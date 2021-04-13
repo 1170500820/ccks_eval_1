@@ -8,6 +8,7 @@ from models.event_detection import *
 from models.sentence_representation_layer import *
 from models.trigger_extraction_model import *
 from models.argument_extraction_model import *
+from models.role_mask import RoleMask
 from evaluate.eval_utils import *
 import torch
 import torch.nn.functional as F
@@ -233,7 +234,7 @@ def train_trigger_extraction(repr_lr=2e-5, tem_lr = 1e-4, epoch=20, epoch_save_c
         pickle.dump(eval_map, open(f'eval_map_{i_epoch + 1}.pk', 'wb'))
 
 
-def train_argument_extraction(repr_lr=2e-5, aem_lr=1e-4, epoch=50, epoch_save_cnt=3, val=True, val_freq=1000, val_start_epoch=-1, inner_model=True):
+def train_argument_extraction(repr_lr=2e-5, aem_lr=1e-4, epoch=50, epoch_save_cnt=3, val=True, val_freq=600, val_start_epoch=-1, inner_model=True):
     """
 
     :param repr_lr:
@@ -250,11 +251,13 @@ def train_argument_extraction(repr_lr=2e-5, aem_lr=1e-4, epoch=50, epoch_save_cn
     # Initiate model, model config, tokenizer and optimizer, Move models to devices
     path_prefix = '../' if not inner_model else ''
     config = BertConfig.from_pretrained(path_prefix + model_path)
+    rfief = pickle.load(open('rfief.pk', 'rb'))
     tokenizer = BertTokenizer.from_pretrained(path_prefix + model_path)
     #   define models and optimizers
     repr_model = SentenceRepresentation(path_prefix + model_path, config.hidden_size, pass_cln=False)
     trigger_repr_model = TriggeredSentenceRepresentation(config.hidden_size, pass_cln=False)
     aem = ArgumentExtractionModel(n_head, config.hidden_size, d_head, config.hidden_dropout_prob, ltp_feature_cnt_fixed)
+    role_mask = RoleMask(rfief)
     optimizer_repr_plm = AdamW(repr_model.PLM.parameters(), lr=repr_lr)
     # optimizer_others = AdamW(list(repr_model.CLN.parameters()) + list(trigger_repr_model.parameters()) + list(aem.parameters()), lr=aem_lr)
     optimizer_repr_cln = AdamW(repr_model.CLN.parameters(), lr=aem_lr)
@@ -300,8 +303,10 @@ def train_argument_extraction(repr_lr=2e-5, aem_lr=1e-4, epoch=50, epoch_save_cn
             h_styp = repr_model(batch_, typ_batch)
             h_styp, RPE = trigger_repr_model(h_styp, trigger_batch)
             start_logits, end_logits = aem(h_styp, syn_batch.cuda(), RPE)  # both (bsz, seq_l, len(role_types))
-            # todo loss?
-            loss = F.binary_cross_entropy(start_logits, gt_batch[0].cuda()) + F.binary_cross_entropy(end_logits, gt_batch[1].cuda())
+            start_logits_mask, end_logits_mask \
+                = role_mask.return_weighted_mask(start_logits, typ_batch), role_mask.return_weighted_mask(end_logits, typ_batch)
+
+            loss = F.binary_cross_entropy(start_logits, gt_batch[0].cuda(), start_logits_mask) + F.binary_cross_entropy(end_logits, gt_batch[1].cuda(), end_logits_mask)
             loss.backward()
             optimizer_repr_plm.step()
             # optimizer_others.step()
@@ -329,6 +334,7 @@ def train_argument_extraction(repr_lr=2e-5, aem_lr=1e-4, epoch=50, epoch_save_cn
                     h_styp = repr_model([val_sent], [val_type])
                     h_styp, RPE = trigger_repr_model(h_styp, [val_trigger])
                     start_logits, end_logits = aem(h_styp, val_syn.cuda(), RPE) # (1, seq_l, len(role_types))
+                    start_logits, end_logits = role_mask(start_logits, [val_type]), role_mask(end_logits, [val_type])
                     start_logits, end_logits = start_logits.squeeze().T, end_logits.squeeze().T # (len(role_types), seq_l)
                     start_results, end_results = (start_logits > argument_extraction_threshold).long().tolist()\
                         , (end_logits > argument_extraction_threshold).long().tolist()
