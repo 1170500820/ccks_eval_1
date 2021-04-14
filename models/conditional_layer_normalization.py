@@ -12,11 +12,24 @@ class ConditionalLayerNormalization(nn.Module):
         :param pass_layer_norm: if True, just return the representation, pass the cln procedure
         """
         super(ConditionalLayerNormalization, self).__init__()
-        self.weight_map = nn.Linear(hidden_size, hidden_size)   # todo bias=False?
-        self.bias_map = nn.Linear(hidden_size, hidden_size)
+        self.weight_map = nn.Linear(hidden_size, hidden_size, bias=False)   # todo bias=False?
+        self.bias_map = nn.Linear(hidden_size, hidden_size, bias=False)
+        self.weight = nn.Parameter(torch.tensor(hidden_size))
+        self.bias = nn.Parameter(torch.tensor(hidden_size))
         self.hidden_size = hidden_size
         self.eps = eps
         self.pass_layer_norm = pass_layer_norm
+        self.reset_weight_and_bias()
+
+    def reset_weight_and_bias(self):
+        """
+        初始化的作用是在训练的开始阶段不让CLN起作用
+        :return:
+        """
+        nn.init.ones_(self.weight)
+        nn.init.zeros_(self.bias)
+        nn.init.zeros_(self.weight_map.weight)
+        nn.init.zeros_(self.bias_map.weight)
 
     def forward(self, representation, condition):
         """
@@ -27,8 +40,8 @@ class ConditionalLayerNormalization(nn.Module):
         """
         if self.pass_layer_norm:
             return representation
-        weight = self.weight_map(condition) # (bsz, 1, hidden_size)
-        bias = self.bias_map(condition) # (bsz, 1, hidden_size)
+        weight = self.weight_map(condition) + self.weight # (bsz, 1, hidden_size)
+        bias = self.bias_map(condition) + self.bias # (bsz, 1, hidden_size)
         # (bsz, 1, hidden) or (bsz, hidden)
         # normed_repr = F.layer_norm(representation, [self.hidden_size], weight, bias) # RuntimeError
         repr_mean = torch.mean(representation, dim=-1, keepdim=True)   # (bsz, 1, hidden)
