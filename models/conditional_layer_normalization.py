@@ -31,8 +31,8 @@ class ConditionalLayerNormalization(nn.Module):
         bias = self.bias_map(condition) # (bsz, 1, hidden_size)
         # (bsz, 1, hidden) or (bsz, hidden)
         # normed_repr = F.layer_norm(representation, [self.hidden_size], weight, bias) # RuntimeError
-        repr_mean = torch.mean(representation, dim=-2).unsqueeze(dim=-2)   # (bsz, 1, hidden)
-        repr_var = torch.var(representation, dim=-2, unbiased=False).unsqueeze(dim=-2) # (bsz, 1, hidden)
+        repr_mean = torch.mean(representation, dim=-1, keepdim=True)   # (bsz, 1, hidden)
+        repr_var = torch.var(representation, dim=-1, unbiased=False, keepdim=True) # (bsz, 1, hidden)
         normed_repr = (representation - repr_mean) / torch.sqrt(repr_var + self.eps)    # (bsz, seq_l, hidden)
         denormed_repr = torch.mul(weight, normed_repr) + bias # weight and bias (bsz, 1, hidden_size)
 
