@@ -234,7 +234,7 @@ def train_trigger_extraction(repr_lr=2e-5, tem_lr = 1e-4, epoch=20, epoch_save_c
         pickle.dump(eval_map, open(f'eval_map_{i_epoch + 1}.pk', 'wb'))
 
 
-def train_argument_extraction(repr_lr=2e-5, aem_lr=1e-4, epoch=50, epoch_save_cnt=3, val=True, val_freq=600, val_start_epoch=-1, inner_model=True):
+def train_argument_extraction(repr_lr=2e-5, aem_lr=1e-4, epoch=50, epoch_save_cnt=3, val=True, loss_freq=10, val_freq=600, val_start_epoch=-1, inner_model=True):
     """
 
     :param repr_lr:
@@ -285,6 +285,7 @@ def train_argument_extraction(repr_lr=2e-5, aem_lr=1e-4, epoch=50, epoch_save_cn
 
     # Step 3
     # Start the training loop
+    eval_result = []
     for i_epoch in range(epoch):
         repr_model.train()
         trigger_repr_model.train()
@@ -305,8 +306,11 @@ def train_argument_extraction(repr_lr=2e-5, aem_lr=1e-4, epoch=50, epoch_save_cn
             start_logits, end_logits = aem(h_styp, syn_batch.cuda(), RPE)  # both (bsz, seq_l, len(role_types))
             start_logits_mask, end_logits_mask \
                 = role_mask.return_weighted_mask(start_logits, typ_batch), role_mask.return_weighted_mask(end_logits, typ_batch)
+            gt_start, gt_end = gt_batch[0].cuda(), gt_batch[1].cuda()
+            start_focal_weight, end_focal_weight = role_mask.return_focal_loss_mask(start_logits, gt_start).cuda(), role_mask.return_focal_loss_mask(end_logits, gt_end).cuda()
+            start_logits_mask, end_logits_mask = start_logits_mask * start_focal_weight, end_logits_mask * end_focal_weight
 
-            loss = F.binary_cross_entropy(start_logits, gt_batch[0].cuda(), start_logits_mask) + F.binary_cross_entropy(end_logits, gt_batch[1].cuda(), end_logits_mask)
+            loss = F.binary_cross_entropy(start_logits, gt_start, start_logits_mask.cuda()) + F.binary_cross_entropy(end_logits, gt_end, end_logits_mask.cuda())
             loss.backward()
             optimizer_repr_plm.step()
             # optimizer_others.step()
@@ -315,7 +319,8 @@ def train_argument_extraction(repr_lr=2e-5, aem_lr=1e-4, epoch=50, epoch_save_cn
             optimizer_aem.step()    # 不同optimizer分别step和一个optimizer自己step，结果有区别吗
 
             epoch_total_loss += loss.float()
-            print(f'epoch:{i_epoch + 1} batch:{i_batch + 1} loss:{loss.float()} epoch_avg_loss:{epoch_total_loss / (i_batch + 1)}')
+            if (i_batch + 1) % loss_freq == 0:
+                print(f'epoch:{i_epoch + 1} batch:{i_batch + 1} loss:{loss.float()} epoch_avg_loss:{epoch_total_loss / (i_batch + 1)}')
 
             if (i_batch + 1) % val_freq == 0 and (i_epoch + 1) >= val_start_epoch:
                 print('evaluating')
@@ -354,7 +359,8 @@ def train_argument_extraction(repr_lr=2e-5, aem_lr=1e-4, epoch=50, epoch_save_cn
                 f_measure = (2 * recall * precision) / (recall + precision) if recall + precision != 0 else 0
                 print(
                     f'total:{total} predict:{predict}, correct:{correct}, precision:{precision}, recall:{recall}, f:{f_measure}')
-
+                eval_result.append((i_epoch + 1, i_batch + 1, total, predict, correct, precision, recall, f_measure))
+                open('eval_result.txt', 'a', encoding='utf-8').write(str(eval_result[-1]) + '\n')
 
 if __name__ == '__main__':
     fire.Fire()
