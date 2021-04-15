@@ -321,7 +321,7 @@ def argument_extraction_reader():
 
     # Step 2
     # Find Data
-    sentences, types, sent_match, trigger, arguments, syntactic = [], [], [], [], [], []
+    ids, sentences, types, sent_match, trigger, arguments, syntactic = [], [], [], [], [], [], []
     # todo 会不会出现事件的trigger重复的情况，我先假设无
     repeat_cnt = 0
     total_event_cnt = 0
@@ -329,6 +329,7 @@ def argument_extraction_reader():
         cur_match = matches[i]
         token2origin, origin2token = cur_match
         events = d['events']
+        cur_id = d['id']
         cur_segment_tensor = segment_feature_tensors[i]
         cur_postag_tensor = postag_feature_tensors[i]
         cur_ner_tensor = ner_feature_tensors[i]
@@ -363,6 +364,7 @@ def argument_extraction_reader():
                 print(i)
             for idx, trig in enumerate(value):
                 sentences.append(cur_sentence)
+                ids.append(cur_id)
                 syntactic.append([cur_segment_tensor, cur_postag_tensor, cur_ner_tensor])
                 types.append(key)
                 sent_match.append(cur_match)
@@ -377,12 +379,12 @@ def argument_extraction_reader():
     # Step 3
     # Randomize
     # 打乱7次
-    assert len(sentences) == len(types) == len(sent_match) == len(trigger) == len(arguments) == len(syntactic)
+    assert len(ids) == len(sentences) == len(types) == len(sent_match) == len(trigger) == len(arguments) == len(syntactic)
     randomize_times = 7
     for k in range(randomize_times):
-        zipped = list(zip(sentences, types, sent_match, trigger, arguments, syntactic))
+        zipped = list(zip(ids, sentences, types, sent_match, trigger, arguments, syntactic))
         random.shuffle(zipped)
-        sentences, types, sent_match, trigger, arguments, syntactic = zip(*zipped)
+        ids, sentences, types, sent_match, trigger, arguments, syntactic = zip(*zipped)
 
     # Step 4
     # Prepare Data
@@ -394,16 +396,34 @@ def argument_extraction_reader():
     #   split
     data_cnt = len(sentences)
     train_cnt = int(data_cnt * train_val_split_ratio)
-    train_sentences, train_types, train_sent_match\
+    train_ids, train_sentences, train_types, train_sent_match\
         , train_triggers, train_arguments, train_syntactic_features\
-        , val_sentences, val_types, val_sent_match\
+        , val_ids, val_sentences, val_types, val_sent_match\
         , val_triggers, val_arguments, val_syntactic_features \
-        = sentences[:train_cnt], types[:train_cnt], sent_match[:train_cnt]\
+        = ids[:train_cnt], sentences[:train_cnt], types[:train_cnt], sent_match[:train_cnt]\
         , trigger[:train_cnt], arguments[:train_cnt], syntactic[:train_cnt]\
-        , sentences[train_cnt:], types[train_cnt:], sent_match[train_cnt:]\
+        , ids[train_cnt:], sentences[train_cnt:], types[train_cnt:], sent_match[train_cnt:]\
         , trigger[train_cnt:], arguments[train_cnt:], syntactic[train_cnt:]
     #   Step 4.2
     #   Prepare Training Data
+    #       delete bad data. Strategy:随机
+    temp_ids, temp_sentences, temp_types, temp_match, temp_triggers, temp_arguments, temp_syntactic_features = [], [], [], [], [], [], []
+    id_trigger_type_set = set()
+    for i, sentences in enumerate(train_sentences):
+        cur_id, cur_trigger, cur_type = train_ids[i], train_triggers[i], train_types[i]
+        if (cur_id, cur_trigger[0], cur_trigger[1], cur_type) in id_trigger_type_set:
+            continue
+        else:
+            id_trigger_type_set.add((cur_id, cur_trigger[0], cur_trigger[1], cur_type))
+            temp_ids.append(cur_id)
+            temp_sentences.append(sentences)
+            temp_types.append(cur_type)
+            temp_match.append(train_sent_match[i])
+            temp_triggers.append(cur_trigger)
+            temp_arguments.append(train_arguments[i])
+            temp_syntactic_features.append(train_syntactic_features[i])
+    train_ids, train_sentences, train_types, train_sent_match, train_triggers, train_arguments, train_syntactic_features\
+        = temp_ids, temp_sentences, temp_types, temp_match, temp_triggers, temp_arguments, temp_syntactic_features
     gts = []
     for i, sentence in enumerate(train_sentences):
         token2origin, origin2token = train_sent_match[i]
