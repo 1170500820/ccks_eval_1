@@ -14,8 +14,8 @@ class ConditionalLayerNormalization(nn.Module):
         super(ConditionalLayerNormalization, self).__init__()
         self.weight_map = nn.Linear(hidden_size, hidden_size, bias=False)   # todo bias=False?
         self.bias_map = nn.Linear(hidden_size, hidden_size, bias=False)
-        self.weight = nn.Parameter(torch.tensor(hidden_size))
-        self.bias = nn.Parameter(torch.tensor(hidden_size))
+        self.weight = nn.Parameter(torch.tensor(hidden_size, dtype=torch.float))
+        self.bias = nn.Parameter(torch.tensor(hidden_size, dtype=torch.float))
         self.hidden_size = hidden_size
         self.eps = eps
         self.pass_layer_norm = pass_layer_norm
