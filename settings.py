@@ -117,6 +117,9 @@ ner_tags_index = {i: x for (i, x) in enumerate(ner_tags)}
 
 n_head = 6
 d_head = 1024
+
+role_alpha = 0.25
+role_gamma = 2
 # Train
 PLMs = ['bert', 'RoBERTa']
 #   RoBERTa config
