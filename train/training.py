@@ -234,7 +234,7 @@ def train_trigger_extraction(repr_lr=2e-5, tem_lr = 1e-4, epoch=20, epoch_save_c
         pickle.dump(eval_map, open(f'eval_map_{i_epoch + 1}.pk', 'wb'))
 
 
-def train_argument_extraction(repr_lr=2e-5, aem_lr=1e-4, epoch=50, epoch_save_cnt=3, val=True, loss_freq=10, val_freq=600, val_start_epoch=-1, inner_model=True):
+def train_argument_extraction(repr_lr=2e-5, aem_lr=1e-4, epoch=50, epoch_save_freq=12, save_start_epoch=12, save_file_name='default', val=True, loss_freq=10, val_freq=100, val_start_epoch=12, inner_model=True):
     """
 
     :param repr_lr:
@@ -258,6 +258,7 @@ def train_argument_extraction(repr_lr=2e-5, aem_lr=1e-4, epoch=50, epoch_save_cn
     trigger_repr_model = TriggeredSentenceRepresentation(config.hidden_size, pass_cln=False)
     aem = ArgumentExtractionModel(n_head, config.hidden_size, d_head, config.hidden_dropout_prob, ltp_feature_cnt_fixed)
     role_mask = RoleMask(rfief)
+
     optimizer_repr_plm = AdamW(repr_model.PLM.parameters(), lr=repr_lr)
     # optimizer_others = AdamW(list(repr_model.CLN.parameters()) + list(trigger_repr_model.parameters()) + list(aem.parameters()), lr=aem_lr)
     optimizer_repr_cln = AdamW(repr_model.CLN.parameters(), lr=aem_lr)
@@ -329,8 +330,9 @@ def train_argument_extraction(repr_lr=2e-5, aem_lr=1e-4, epoch=50, epoch_save_cn
                 aem.eval()
 
                 total, predict, correct = 0, 0, 0
-
+                eval_result_detailed = []   # result for each eval
                 for i_val, val_sent in tqdm(list(enumerate(val_sentences))):
+                    eval_result_detailed.append([]) # result for each sentence
                     val_type = val_types[i_val]
                     val_trigger = val_triggers[i_val]
                     val_syn = val_syns[i_val]
@@ -348,12 +350,14 @@ def train_argument_extraction(repr_lr=2e-5, aem_lr=1e-4, epoch=50, epoch_save_cn
                         result_span = argument_span_determination(start_results[i_span], end_results[i_span]
                                                                   , start_logits[i_span], end_logits[i_span])
                         result_spans.append(result_span)
+                        eval_result_detailed[-1].append(result_span)
 
                     for i_compare in range(len(role_types)):
                         total += len(val_span[i_compare])
                         predict += len(result_spans[i_compare])
                         correct += len(set(map(tuple, val_span[i_compare])).intersection(set(map(tuple, result_spans[i_compare]))))
 
+                pickle.dump(eval_result_detailed, open(f'eval_spans/span_epoch-{i_epoch + 1}_batch-{i_batch + 1}.pk', 'wb'))
                 recall = correct / total if total != 0 else 0
                 precision = correct / predict if predict != 0 else 0
                 f_measure = (2 * recall * precision) / (recall + precision) if recall + precision != 0 else 0
@@ -361,6 +365,15 @@ def train_argument_extraction(repr_lr=2e-5, aem_lr=1e-4, epoch=50, epoch_save_cn
                     f'total:{total} predict:{predict}, correct:{correct}, precision:{precision}, recall:{recall}, f:{f_measure}')
                 eval_result.append((i_epoch + 1, i_batch + 1, total, predict, correct, precision, recall, f_measure))
                 open('eval_result.txt', 'a', encoding='utf-8').write(str(eval_result[-1]) + '\n')
+
+        # Save models
+        # print('epoch--' + str(i_epoch + 1))
+        if (i_epoch + 1) % epoch_save_freq == 0 and (i_epoch + 1) >= save_start_epoch:
+            print('saving models...')
+            torch.save(trigger_repr_model.state_dict(), save_file_name + '_epoch-' + str(i_epoch + 1) + '_trigger-repr-model' + '.pt')
+            torch.save(aem.state_dict(), save_file_name + '_epoch-' + str(i_epoch + 1) + '_aem' + '.pt')
+            torch.save(repr_model.state_dict(), save_file_name + '_epoch-' + str(i_epoch + 1) + '_repr-model' + '.pt')
+
 
 if __name__ == '__main__':
     fire.Fire()
