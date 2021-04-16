@@ -11,6 +11,7 @@ model_path = 'bert-base-chinese'
 # model_path = '../chinese_wwm_pytorch'
 # model_path = '../chinese_wwm_ext_pytorch'
 # model_path = '../chinese_wwm_ext_pytorch_ContTrain_epoch_1_batch_500_bsz_4'
+inner_model = True
 
 # Data Definitions
 role_types = [
@@ -118,7 +119,7 @@ ner_tags_index = {i: x for (i, x) in enumerate(ner_tags)}
 n_head = 6
 d_head = 1024
 
-role_alpha = 0.25
+role_alpha = 0.35
 role_gamma = 2
 # Train
 PLMs = ['bert', 'RoBERTa']
