@@ -1,4 +1,11 @@
+import sys
+sys.path.append('..')
 import torch
+from models.sentence_representation_layer import *
+from models.trigger_extraction_model import *
+from models.argument_extraction_model import *
+from models.role_mask import *
+import pickle
 
 
 def output2spans(model_output, threshold=0.5):
@@ -74,3 +81,29 @@ def argument_span_determination(binary_start: [], binary_end: [], prob_start: []
     if state == 3:  # todo 这个debug有问题吗？
         spans.append([a_s, a_e])
     return spans
+
+
+def load_model_ae_aem(path, n_head, hidden_size, d_head, hidden_dropout_prob, syntactic_feature_size):
+    aem = ArgumentExtractionModel(n_head, hidden_size, d_head, hidden_dropout_prob, syntactic_feature_size)
+    aem.load_state_dict(torch.load(path))
+    aem.eval()
+    return aem
+
+
+def load_model_ae_repr(path, PLM_path, hidden_size):
+    repr_model = SentenceRepresentation(PLM_path, hidden_size)
+    repr_model.load_state_dict(torch.load(path))
+    repr_model.eval()
+    return repr_model
+
+
+def load_model_ae_trigger_repr(path, hidden_size):
+    trigger_repr_model = TriggeredSentenceRepresentation(hidden_size)
+    trigger_repr_model.load_state_dict(torch.load(path))
+    trigger_repr_model.eval()
+    return trigger_repr_model
+
+
+def load_model_ae_role_mask(rfief_path):
+    role_mask = RoleMask(pickle.load(open(rfief_path, 'rb')))
+    return role_mask
