@@ -407,23 +407,23 @@ def argument_extraction_reader():
     #   Step 4.2
     #   Prepare Training Data
     #       delete bad data. Strategy:随机
-    temp_ids, temp_sentences, temp_types, temp_match, temp_triggers, temp_arguments, temp_syntactic_features = [], [], [], [], [], [], []
-    id_trigger_type_set = set()
-    for i, sentences in enumerate(train_sentences):
-        cur_id, cur_trigger, cur_type = train_ids[i], train_triggers[i], train_types[i]
-        if (cur_id, cur_trigger[0], cur_trigger[1], cur_type) in id_trigger_type_set:
-            continue
-        else:
-            id_trigger_type_set.add((cur_id, cur_trigger[0], cur_trigger[1], cur_type))
-            temp_ids.append(cur_id)
-            temp_sentences.append(sentences)
-            temp_types.append(cur_type)
-            temp_match.append(train_sent_match[i])
-            temp_triggers.append(cur_trigger)
-            temp_arguments.append(train_arguments[i])
-            temp_syntactic_features.append(train_syntactic_features[i])
-    train_ids, train_sentences, train_types, train_sent_match, train_triggers, train_arguments, train_syntactic_features\
-        = temp_ids, temp_sentences, temp_types, temp_match, temp_triggers, temp_arguments, temp_syntactic_features
+    # temp_ids, temp_sentences, temp_types, temp_match, temp_triggers, temp_arguments, temp_syntactic_features = [], [], [], [], [], [], []
+    # id_trigger_type_set = set()
+    # for i, sentences in enumerate(train_sentences):
+    #     cur_id, cur_trigger, cur_type = train_ids[i], train_triggers[i], train_types[i]
+    #     if (cur_id, cur_trigger[0], cur_trigger[1], cur_type) in id_trigger_type_set:
+    #         continue
+    #     else:
+    #         id_trigger_type_set.add((cur_id, cur_trigger[0], cur_trigger[1], cur_type))
+    #         temp_ids.append(cur_id)
+    #         temp_sentences.append(sentences)
+    #         temp_types.append(cur_type)
+    #         temp_match.append(train_sent_match[i])
+    #         temp_triggers.append(cur_trigger)
+    #         temp_arguments.append(train_arguments[i])
+    #         temp_syntactic_features.append(train_syntactic_features[i])
+    # train_ids, train_sentences, train_types, train_sent_match, train_triggers, train_arguments, train_syntactic_features\
+    #     = temp_ids, temp_sentences, temp_types, temp_match, temp_triggers, temp_arguments, temp_syntactic_features
     gts = []
     for i, sentence in enumerate(train_sentences):
         token2origin, origin2token = train_sent_match[i]
