@@ -107,3 +107,34 @@ def load_model_ae_trigger_repr(path, hidden_size):
 def load_model_ae_role_mask(rfief_path):
     role_mask = RoleMask(pickle.load(open(rfief_path, 'rb')))
     return role_mask
+
+
+def count_components(lst):
+    """
+    对lst中的元素进行计数
+    lst的元素必须是hashable
+    :param lst:
+    :return:
+    """
+    cnt = {}
+    for a in lst:
+        if a in cnt:
+            cnt[a] = cnt[a] + 1
+        else:
+            cnt[a] = 1
+    return cnt
+
+
+def count_components_percentage(lst):
+    """
+    求出lst每个元素所占的百分比
+    lst中的元素必须是hashable
+    :param lst:
+    :return:
+    """
+    cnt = count_components(lst)
+    total = sum(map(lambda x: x[1], cnt.items()))
+    per = {}
+    for key, value in cnt.items():
+        per[key] = value / total
+    return per
