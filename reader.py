@@ -316,7 +316,7 @@ def argument_extraction_reader():
     # Read Data
     data = read_file()
     matches = pickle.load(open('preprocess/matches.pk', 'rb'))
-    segment_feature_tensors, postag_feature_tensors, ner_feature_tensors = pickle.load(
+    segment_feature_tensors, postag_feature_tensors, ner_feature_tensors, regex_proportion_tensors = pickle.load(
         open('preprocess/syntactic_feature_tensors.pk', 'rb'))
 
     # Step 2
@@ -333,6 +333,7 @@ def argument_extraction_reader():
         cur_segment_tensor = segment_feature_tensors[i]
         cur_postag_tensor = postag_feature_tensors[i]
         cur_ner_tensor = ner_feature_tensors[i]
+        cur_regex_pro_tensor = regex_proportion_tensors[i]
         cur_sentence = d['content'].lower().replace(' ', '_')
         type_dict = {}  # key:event type  value:[trigger_span1, trigger_span2, ...]
         argument_dict = {}  # key:event type value:[arg_lst1, arg_lst2] 与type_dict种的trigger_span相对应
@@ -365,7 +366,7 @@ def argument_extraction_reader():
             for idx, trig in enumerate(value):
                 sentences.append(cur_sentence)
                 ids.append(cur_id)
-                syntactic.append([cur_segment_tensor, cur_postag_tensor, cur_ner_tensor])
+                syntactic.append([cur_segment_tensor, cur_postag_tensor, cur_ner_tensor, cur_regex_pro_tensor])
                 types.append(key)
                 sent_match.append(cur_match)
                 trigger.append(trig)  # (start, end)
