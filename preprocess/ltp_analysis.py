@@ -12,6 +12,7 @@ import json
 from tqdm import tqdm
 import torch
 from settings import *
+import re
 
 
 def read_file_in_ltp(filepath):
@@ -206,6 +207,30 @@ def generate_ner_features(nertags, sent_seg_matches, matches):
     return features
 
 
+def generate_regex_feature(data, regex_str, matches):
+    """
+    1 at matched area, 0 at unmatched
+    :param data: origin data from trainbase.json
+    :param regex_str: regex string to be searched
+    :param matches:
+    :return: list of (seq_l, 1)
+    """
+    features = []
+    for i, d in enumerate(data):
+        sentence = d['content'].lower().replace(' ', '_')
+        token2origin, origin2token = matches[i]
+        finds = re.finditer(regex_str, sentence)
+        tokenized_size = len(token2origin) - 2
+        token_map = [0] * tokenized_size
+        for fs in finds:
+            f_span = fs.span()
+            # todo 检查一下
+            for p in range(origin2token[f_span[0]] - 1, origin2token[f_span[1] - 1]):
+                token_map[p] = 1
+        features.append(token_map)
+    return features
+
+
 if __name__ == '__main__':
     data, segmented, posed, nered = generate_ltp_results()
     matches = pickle.load(open('matches.pk', 'rb'))
@@ -213,15 +238,20 @@ if __name__ == '__main__':
     sentence_segment_matches = sentence_segment_match(data, segmented)
     postag_features = generate_postag_feature(posed, sentence_segment_matches, matches)
     ner_features = generate_ner_features(nered, sentence_segment_matches, matches)
+    regex_proportion_features = generate_regex_feature(data, percentage_regex, matches)
 
     # tensorize
     segment_feature_tensors, postag_feature_tensors, ner_feature_tensors = [], [], []
+    regex_proportion_tensors = []
     for s in segment_features:
         segment_feature_tensors.append(torch.tensor(s, dtype=torch.float).unsqueeze(dim=1))    # (seq_l, 1)
     for s in postag_features:
         postag_feature_tensors.append(torch.tensor(s, dtype=torch.float))  # (seq_l, 30)
     for s in ner_features:
         ner_feature_tensors.append(torch.tensor(s, dtype=torch.float)) # (seq_l, _)
-    pickle.dump([segment_feature_tensors, postag_feature_tensors, ner_feature_tensors], open('syntactic_feature_tensors.pk', 'wb'))
+    for s in regex_proportion_features:
+        regex_proportion_tensors.append(torch.tensor(s, dtype=torch.float)) # (seq_l, 1)
+    # todo 完全可以在这里就完成pad_sequence
+    pickle.dump([segment_feature_tensors, postag_feature_tensors, ner_feature_tensors, regex_proportion_tensors], open('syntactic_feature_tensors.pk', 'wb'))
     # 剩下只需要stack到embedding当中去即可
     # 如果需要truncation咋办？
