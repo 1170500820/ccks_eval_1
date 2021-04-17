@@ -1,8 +1,11 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import pickle
 from .self_attentions import SelfAttn
 from settings import role_types
+from models.sentence_representation_layer import SentenceRepresentation, TriggeredSentenceRepresentation
+from models.role_mask import RoleMask
 
 
 class ArgumentExtractionModel(nn.Module):
@@ -66,3 +69,50 @@ class ArgumentExtractionModel(nn.Module):
         start_logits, end_logits = self.fcn_start(final_repr), self.fcn_end(final_repr) # (bsz, seq_l, len(role_types))
         starts, ends = F.sigmoid(start_logits), F.sigmoid(end_logits)   # (bsz, seq_l, len(role_types))
         return starts, ends
+
+
+class FullAEM(nn.Module):
+    def __init__(self, fullAemConfig):
+        """
+        fullAemConfig should contains:
+            - PLM_Path for PLM in SentenceRepresentation Model
+            - SentenceRepresentation hidden size
+            - TriggeredSentenceRepresentation hidden size
+            - Argument Extraction Head:
+                -- n_head
+                -- d_head
+                -- hidden size
+                -- dropout prob
+                -- syntactic size
+        assume hidden size to be the same for convenient
+        :param fullAemConfig:
+        """
+        super(FullAEM, self).__init__()
+        self.repr_model = SentenceRepresentation(
+            fullAemConfig.PLM_path,
+            fullAemConfig.hidden_size)
+        self.trigger_repr_model = TriggeredSentenceRepresentation(fullAemConfig.hidden_size)
+        self.aem = ArgumentExtractionModel(
+            fullAemConfig.n_head,
+            fullAemConfig.hidden_size,
+            fullAemConfig.d_head,
+            fullAemConfig.hidden_dropout_prob,
+            fullAemConfig.syntactic_size)
+        self.role_mask = RoleMask(pickle.load(open(fullAemConfig.rfief_path, 'rb')))
+
+    def forward(self, **model_input):
+        """
+        model_input must contains:
+            - sentence: sentence batch
+            - type: sentence type batch
+            - trigger: trigger span batch
+            - syntactic: syntactic feature batch
+            - gt: ground truth batch (needed if calculate loss)
+        :param model_input:
+        :return:
+        """
+        sentence_batch, type_batch, trigger_batch, syntactic_batch, gt_batch \
+            = model_input['sentence'], model_input['type'], model_input['trigger'], model_input['syntactic'], \
+              model_input['gt']
+        h_styp = self.repr_model(sentence_batch, type_batch)
+        h_styp, RPE = self.trigger_repr_model(h_styp, trigger_batch)
