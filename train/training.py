@@ -234,7 +234,7 @@ def train_trigger_extraction(repr_lr=2e-5, tem_lr = 1e-4, epoch=20, epoch_save_c
         pickle.dump(eval_map, open(f'eval_map_{i_epoch + 1}.pk', 'wb'))
 
 
-def train_argument_extraction(repr_lr=2e-5, aem_lr=1e-4, epoch=50, epoch_save_freq=12, save_start_epoch=12, save_file_name='default', val=True, loss_freq=10, val_freq=100, val_start_epoch=12, inner_model=True):
+def train_argument_extraction(repr_lr=2e-5, aem_lr=1e-4, epoch=50, epoch_save_freq=12, save_start_epoch=12, save_file_name='default', val=True, loss_freq=10, val_freq=100, val_start_epoch=12, inner_model=True, save_eval=False):
     """
 
     :param repr_lr:
@@ -357,7 +357,8 @@ def train_argument_extraction(repr_lr=2e-5, aem_lr=1e-4, epoch=50, epoch_save_fr
                         predict += len(result_spans[i_compare])
                         correct += len(set(map(tuple, val_span[i_compare])).intersection(set(map(tuple, result_spans[i_compare]))))
 
-                pickle.dump(eval_result_detailed, open(f'eval_spans/span_epoch-{i_epoch + 1}_batch-{i_batch + 1}.pk', 'wb'))
+                if save_eval:
+                    pickle.dump(eval_result_detailed, open(f'eval_spans/span_epoch-{i_epoch + 1}_batch-{i_batch + 1}.pk', 'wb'))
                 recall = correct / total if total != 0 else 0
                 precision = correct / predict if predict != 0 else 0
                 f_measure = (2 * recall * precision) / (recall + precision) if recall + precision != 0 else 0
