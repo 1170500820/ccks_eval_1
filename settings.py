@@ -15,25 +15,25 @@ inner_model = True
 
 # Data Definitions
 role_types = [
-    'obj-per',  # 0
-    'amount',   # 1
-    'title',    # 2
-    'sub-org',  # 3
-    'number',   # 4
-    'way',      # 5
-    'collateral',   # 6
-    'obj',      # 7
-    'target-company',   # 8
-    'share-org',    # 9
-    'sub-per',  # 10
-    'sub',      # 11
-    'data',     # 12
-    'obj-org',  # 13
+    # 'obj-per',  # 0
+    # 'amount',   # 1
+    # 'title',    # 2
+    # 'sub-org',  # 3
+    # 'number',   # 4
+    # 'way',      # 5
+    # 'collateral',   # 6
+    # 'obj',      # 7
+    # 'target-company',   # 8
+    # 'share-org',    # 9
+    # 'sub-per',  # 10
+    # 'sub',      # 11
+    # 'data',     # 12
+    # 'obj-org',  # 13
     'proportion',   # 14
-    'date',     # 15
-    'share-per',    # 16
-    'institution',  # 17
-    'money'     # 18
+    # 'date',     # 15
+    # 'share-per',    # 16
+    # 'institution',  # 17
+    # 'money'     # 18
 ]
 role_index = {v: i for i, v in enumerate(role_types)}
 event_types_init = [
@@ -71,6 +71,11 @@ event_available_roles = {
     '判决': {'institution', 'sub-org', 'sub-per', 'obj-org', 'obj-per', 'date', 'money'}
 }
 
+# Regex
+percentage_regex = r'\d+(\.\d+)?%'
+digits_regex = r'(不)?(低于|超过|超)?\d+(\.\d+)?(万|亿)?(股)?'
+date_regex = r'((\d+|今|去|前)\s?年底?)?(\d+月份?)?(\d+日)?'
+
 # Model
 segment_feature = True
 segment_feature_cnt = 1 # 标记开始与非开始 assert token[0]为开始 非CLS
@@ -87,12 +92,16 @@ parse_feature_cnt = 0
 role_feature = False
 role_feature_cnt = 0
 
+regex_proportion_feature = True
+regex_proportion_feature_cnt = 1
+
 ltp_feature = True
 ltp_feature_cnt = (segment_feature_cnt if segment_feature else 0) + \
                   (postag_feature_cnt if postag_feature else 0) + \
                   (ner_feature_cnt if ner_feature else 0) + \
                   (parse_feature_cnt if parse_feature else 0) + \
-                  (role_feature_cnt if role_feature else 0)
+                  (role_feature_cnt if role_feature else 0) + \
+                  (regex_proportion_feature_cnt if regex_proportion_feature else 0)
 ltp_feature_cnt_fixed = ltp_feature_cnt + 2 # todo pos与ner分别加入两个占位符
 
 pos_tags = ['a', 'b', 'c', 'd', 'e', 'g', 'h', 'i', 'j', 'k', 'm', 'n', 'nd', 'nh', 'ni', 'nl', 'ns', 'nt', 'nz', 'o',
