@@ -13,6 +13,7 @@ from evaluate.eval_utils import *
 from analyze.bad_case_analysis_utils import score_argument_extraction, EvalRecord
 import torch
 import torch.nn.functional as F
+from preprocess.process_utils import label_smoothing_multi
 import pickle
 import fire
 from tqdm import tqdm
@@ -235,9 +236,24 @@ def train_trigger_extraction(repr_lr=2e-5, tem_lr = 1e-4, epoch=20, epoch_save_c
         pickle.dump(eval_map, open(f'eval_map_{i_epoch + 1}.pk', 'wb'))
 
 
-def train_argument_extraction(repr_lr=2e-5, aem_lr=1e-4, epoch=50, epoch_save_freq=12, save_start_epoch=12, save_file_name='default', val=True, loss_freq=10, val_freq=20, val_start_epoch=1, inner_model=True, save_eval=False, record_save_epoch=6):
+def train_argument_extraction(
+        repr_lr=2e-5,
+        aem_lr=1e-4,
+        epoch=50,
+        epoch_save_freq=12,
+        save_start_epoch=12,
+        save_file_name='default',
+        val=True,
+        loss_freq=10,
+        val_freq=20,
+        val_start_epoch=1,
+        inner_model=True,
+        save_eval=False,
+        record_save_epoch=6,
+        smooth=activate_label_smoothing):
     """
 
+    :param smooth:
     :param repr_lr:
     :param aem_lr:
     :param epoch:
@@ -314,7 +330,13 @@ def train_argument_extraction(repr_lr=2e-5, aem_lr=1e-4, epoch=50, epoch_save_fr
             start_focal_weight, end_focal_weight = role_mask.return_focal_loss_mask(start_logits, gt_start).cuda(), role_mask.return_focal_loss_mask(end_logits, gt_end).cuda()
             start_logits_mask, end_logits_mask = start_logits_mask * start_focal_weight, end_logits_mask * end_focal_weight
 
-            loss = F.binary_cross_entropy(start_logits, gt_start, start_logits_mask.cuda()) + F.binary_cross_entropy(end_logits, gt_end, end_logits_mask.cuda())
+            if smooth:
+                loss = F.binary_cross_entropy(start_logits, label_smoothing_multi(gt_start), start_logits_mask.cuda()) \
+                       + F.binary_cross_entropy(end_logits, label_smoothing_multi(gt_end), end_logits_mask.cuda())
+            else:
+                loss = F.binary_cross_entropy(start_logits, gt_start,
+                                              start_logits_mask.cuda()) + F.binary_cross_entropy(end_logits, gt_end,
+                                                                                                 end_logits_mask.cuda())
             loss.backward()
             optimizer_repr_plm.step()
             # optimizer_others.step()
