@@ -10,6 +10,7 @@ from models.trigger_extraction_model import *
 from models.argument_extraction_model import *
 from models.role_mask import RoleMask
 from evaluate.eval_utils import *
+from analyze.bad_case_analysis_utils import score_argument_extraction, EvalRecord
 import torch
 import torch.nn.functional as F
 import pickle
@@ -234,7 +235,7 @@ def train_trigger_extraction(repr_lr=2e-5, tem_lr = 1e-4, epoch=20, epoch_save_c
         pickle.dump(eval_map, open(f'eval_map_{i_epoch + 1}.pk', 'wb'))
 
 
-def train_argument_extraction(repr_lr=2e-5, aem_lr=1e-4, epoch=50, epoch_save_freq=12, save_start_epoch=12, save_file_name='default', val=True, loss_freq=10, val_freq=100, val_start_epoch=12, inner_model=True, save_eval=False):
+def train_argument_extraction(repr_lr=2e-5, aem_lr=1e-4, epoch=50, epoch_save_freq=12, save_start_epoch=12, save_file_name='default', val=True, loss_freq=10, val_freq=20, val_start_epoch=1, inner_model=True, save_eval=False, record_save_epoch=6):
     """
 
     :param repr_lr:
@@ -287,6 +288,8 @@ def train_argument_extraction(repr_lr=2e-5, aem_lr=1e-4, epoch=50, epoch_save_fr
     # Step 3
     # Start the training loop
     eval_result = []
+    record = EvalRecord(arg_spans)  # 记录每一次eval的结果
+    eval_timestep = 0
     for i_epoch in range(epoch):
         repr_model.train()
         trigger_repr_model.train()
@@ -330,9 +333,8 @@ def train_argument_extraction(repr_lr=2e-5, aem_lr=1e-4, epoch=50, epoch_save_fr
                 aem.eval()
 
                 total, predict, correct = 0, 0, 0
-                eval_result_detailed = []   # result for each eval
+                scores = [] # 每一轮evaluate, 每一个sentence的预测评分 len(scores) = len(val_sentences)
                 for i_val, val_sent in tqdm(list(enumerate(val_sentences))):
-                    eval_result_detailed.append([]) # result for each sentence
                     val_type = val_types[i_val]
                     val_trigger = val_triggers[i_val]
                     val_syn = val_syns[i_val]
@@ -342,23 +344,21 @@ def train_argument_extraction(repr_lr=2e-5, aem_lr=1e-4, epoch=50, epoch_save_fr
                     h_styp, RPE = trigger_repr_model(h_styp, [val_trigger])
                     start_logits, end_logits = aem(h_styp, val_syn.cuda(), RPE) # (1, seq_l, len(role_types))
                     start_logits, end_logits = role_mask(start_logits, [val_type]), role_mask(end_logits, [val_type])
-                    start_logits, end_logits = start_logits.squeeze().T, end_logits.squeeze().T # (len(role_types), seq_l)
+                    start_logits, end_logits = start_logits.squeeze(dim=0).T, end_logits.squeeze(dim=0).T # (len(role_types), seq_l)
                     start_results, end_results = (start_logits > argument_extraction_threshold).long().tolist()\
                         , (end_logits > argument_extraction_threshold).long().tolist()
                     result_spans = []
                     for i_span in range(len(role_types)):
                         result_span = argument_span_determination(start_results[i_span], end_results[i_span]
                                                                   , start_logits[i_span], end_logits[i_span])
-                        result_spans.append(result_span)
-                        eval_result_detailed[-1].append(result_span)
-
+                        result_spans.append(list(map(tuple, result_span)))
+                    scores.append(score_argument_extraction(val_sent, val_type, result_spans, val_span))    # 评分
+                    record.record(eval_timestep, scores[-1], result_spans)
                     for i_compare in range(len(role_types)):
                         total += len(val_span[i_compare])
                         predict += len(result_spans[i_compare])
                         correct += len(set(map(tuple, val_span[i_compare])).intersection(set(map(tuple, result_spans[i_compare]))))
 
-                if save_eval:
-                    pickle.dump(eval_result_detailed, open(f'eval_spans/span_epoch-{i_epoch + 1}_batch-{i_batch + 1}.pk', 'wb'))
                 recall = correct / total if total != 0 else 0
                 precision = correct / predict if predict != 0 else 0
                 f_measure = (2 * recall * precision) / (recall + precision) if recall + precision != 0 else 0
@@ -366,7 +366,12 @@ def train_argument_extraction(repr_lr=2e-5, aem_lr=1e-4, epoch=50, epoch_save_fr
                     f'total:{total} predict:{predict}, correct:{correct}, precision:{precision}, recall:{recall}, f:{f_measure}')
                 eval_result.append((i_epoch + 1, i_batch + 1, total, predict, correct, precision, recall, f_measure))
                 open('eval_result.txt', 'a', encoding='utf-8').write(str(eval_result[-1]) + '\n')
-
+                eval_timestep += 1
+                repr_model.train()
+                trigger_repr_model.train()
+                aem.train()
+        if (i_epoch + 1) == record_save_epoch:
+            record.save('record.pk')
         # Save models
         # print('epoch--' + str(i_epoch + 1))
         if (i_epoch + 1) % epoch_save_freq == 0 and (i_epoch + 1) >= save_start_epoch:
