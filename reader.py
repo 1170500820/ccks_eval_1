@@ -309,10 +309,6 @@ def argument_extraction_reader():
         token2origin, origin2token = cur_match
         events = d['events']
         cur_id = d['id']
-        # cur_segment_tensor = segment_feature_tensors[i]
-        # cur_postag_tensor = postag_feature_tensors[i]
-        # cur_ner_tensor = ner_feature_tensors[i]
-        # cur_regex_pro_tensor = regex_proportion_tensors[i]
         cur_syntactic_tensor = syntactic_tensors[i]
         cur_sentence = d['content'].lower().replace(' ', '_')
         type_dict = {}  # key:event type  value:[trigger_span1, trigger_span2, ...]
@@ -338,22 +334,55 @@ def argument_extraction_reader():
             argument_dict[cur_event_type].append(args_except_trigger)   # args_except_trigger:[mention1, mention2, ...]
             # mention: word, span, role
         for key, value in type_dict.items():
+            # 对key类型的下的所有事件(trigger存放于value中)
             # triggers不去重了，因此value中可能包含重复的span，
             total_event_cnt += len(value)
             if len(value) != len(set(value)):
                 repeat_cnt += 1
                 print(i)
+            # 下面这段代码是直接按原顺序组织arguments和trigger，即可能存在重复的sentence-type-trigger对
+            # for idx, trig in enumerate(value):
+            #     sentences.append(cur_sentence)
+            #     ids.append(cur_id)
+            #     # syntactic.append([cur_segment_tensor, cur_postag_tensor, cur_ner_tensor, cur_regex_pro_tensor])
+            #     syntactic.append(cur_syntactic_tensor)
+            #     types.append(key)
+            #     sent_match.append(cur_match)
+            #     trigger.append(trig)  # (start, end)
+            #     # todo 如果两个事件的trigger相同，不如合并他们的roles作为同一个事件?
+            #     # todo 如果要去重的话也不难，在此处加一个for循环重新构造spans和roles就行
+            #     arguments.append(argument_dict[key][idx])
+            # 下面这段代码是将拥有相同trigger的arguments都合并。
+            all_argument_of_these_triggers = {}
             for idx, trig in enumerate(value):
-                sentences.append(cur_sentence)
-                ids.append(cur_id)
-                # syntactic.append([cur_segment_tensor, cur_postag_tensor, cur_ner_tensor, cur_regex_pro_tensor])
-                syntactic.append(cur_syntactic_tensor)
-                types.append(key)
-                sent_match.append(cur_match)
-                trigger.append(trig)  # (start, end)
-                # todo 如果两个事件的trigger相同，不如合并他们的roles作为同一个事件?
-                # todo 如果要去重的话也不难，在此处加一个for循环重新构造spans和roles就行
-                arguments.append(argument_dict[key][idx])
+                if trig not in all_argument_of_these_triggers:
+                    all_argument_of_these_triggers[trig] = {
+                        'sentence': cur_sentence,
+                        'id': cur_id,
+                        'syntactic': cur_syntactic_tensor,
+                        'type': key,
+                        'match': cur_match,
+                        'args': set()
+                    }
+                for cur_trig_argument in argument_dict[key][idx]:
+                    # cur_hashable_arg = {
+                    #     'word': cur_trig_argument['word'],
+                    #     'span': tuple(cur_trig_argument['span']),
+                    #     'role': cur_trig_argument['role']
+                    # }
+                    cur_hashable_arg = (cur_trig_argument['word'], tuple(cur_trig_argument['span']),
+                                        cur_trig_argument['role'])
+                    all_argument_of_these_triggers[trig]['args'].add(cur_hashable_arg)
+            for key1, value1 in all_argument_of_these_triggers.items():
+                sentences.append(value1['sentence'])
+                ids.append(value1['id'])
+                syntactic.append(value1['syntactic'])
+                types.append(value1['type'])
+                sent_match.append(value1['match'])
+                trigger.append(key1)
+                arguments.append(list(map(lambda x: {'word': x[0], 'span': x[1], 'role': x[2]}, value1['args'])))
+
+
 
     print('repeat_cnt:', repeat_cnt)   # 类型相同，触发词相同的不同事件
     print('total event cnt:', total_event_cnt)
