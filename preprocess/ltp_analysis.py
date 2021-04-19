@@ -241,17 +241,19 @@ if __name__ == '__main__':
     regex_proportion_features = generate_regex_feature(data, percentage_regex, matches)
 
     # tensorize
+    feature_tensors = []
     segment_feature_tensors, postag_feature_tensors, ner_feature_tensors = [], [], []
     regex_proportion_tensors = []
-    for s in segment_features:
-        segment_feature_tensors.append(torch.tensor(s, dtype=torch.float).unsqueeze(dim=1))    # (seq_l, 1)
-    for s in postag_features:
-        postag_feature_tensors.append(torch.tensor(s, dtype=torch.float))  # (seq_l, 30)
-    for s in ner_features:
-        ner_feature_tensors.append(torch.tensor(s, dtype=torch.float)) # (seq_l, _)
-    for s in regex_proportion_features:
-        regex_proportion_tensors.append(torch.tensor(s, dtype=torch.float)) # (seq_l, 1)
-    # todo 完全可以在这里就完成pad_sequence
-    pickle.dump([segment_feature_tensors, postag_feature_tensors, ner_feature_tensors, regex_proportion_tensors], open('syntactic_feature_tensors.pk', 'wb'))
+    syntactic_combined = []
+    for i, seg in enumerate(segment_features):
+        pos, ner, reg_prop = postag_features[i], ner_features[i], regex_proportion_features[i]
+        # 只含一层的特征需要unsqueeze, 否则会变成 (seq_l)
+        syntactic_combined.append(torch.tensor(seg, dtype=torch.float).unsqueeze(dim=1))    # (seq_l, 1)
+        syntactic_combined.append(torch.tensor(pos, dtype=torch.float))
+        syntactic_combined.append(torch.tensor(ner, dtype=torch.float))
+        syntactic_combined.append(torch.tensor(reg_prop, dtype=torch.float).unsqueeze(dim=1))
+        feature_tensors.append(torch.cat(syntactic_combined, dim=1))    # (seq_l, syntactic_size)
+        syntactic_combined = []
+    pickle.dump(feature_tensors, open('syntactic_feature_tensors.pk', 'wb'))
     # 剩下只需要stack到embedding当中去即可
     # 如果需要truncation咋办？
