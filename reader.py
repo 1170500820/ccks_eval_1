@@ -42,7 +42,7 @@ def simple_batchify(train_sentences, train_types, gts, train_syntactic_features)
             gt_starts, gt_ends = torch.stack(temp_gt_starts), torch.stack(temp_gt_ends)
             train_gts_batch.append([gt_starts, gt_ends])  # both (bsz, seq_l)
             # pad syntactic features
-            #   pad [0] on segment feature, and pad [[0, 0, ..., 1], ] on postag and ner
+            #   pad [0] on segment feature, and pad [[0, 0, ..., 1], ] on postag and ner todo WHY?
             max_l = max(temp_synctactic_l)
             for s_i in range(len(temp_syntactic_segment)):
                 pad_l = max_l - temp_syntactic_segment[s_i].size()[0]
@@ -77,19 +77,21 @@ def simple_batchify(train_sentences, train_types, gts, train_syntactic_features)
 
 def simple_bachify_for_arguments(train_sentences, train_types, train_trigs, gts, train_syntactic_features):
     train_sentences_batch, train_types_batch, train_triggers_batch, train_gts_batch, train_syntactic_batch = [], [], [], [], []
-    temp_sent, temp_typ, temp_trigs, temp_gt_starts, temp_gt_ends, temp_syntactic_segment, temp_syntactic_postag, temp_syntactic_ner\
-        = [], [], [], [], [], [], [], []
+    temp_sent, temp_typ, temp_trigs, temp_gt_starts, temp_gt_ends\
+        = [], [], [], [], []
     temp_synctactic_l, temp_syntactic_combine = [], []
+    temp_syntactic = []
     for i, sentence in enumerate(train_sentences):
         temp_sent.append(sentence)
         temp_typ.append(train_types[i])
         temp_trigs.append(train_trigs[i])
         temp_gt_starts.append(gts[i][0].T)    # (seq_l, len(role_types)), seq_l are various
         temp_gt_ends.append(gts[i][1].T)
-        temp_syntactic_segment.append(train_syntactic_features[i][0])
-        temp_syntactic_postag.append(train_syntactic_features[i][1])
-        temp_syntactic_ner.append(train_syntactic_features[i][2])
-        temp_synctactic_l.append(temp_syntactic_segment[-1].size()[0])
+        # temp_syntactic_segment.append(train_syntactic_features[i][0])
+        # temp_syntactic_postag.append(train_syntactic_features[i][1])
+        # temp_syntactic_ner.append(train_syntactic_features[i][2])
+        temp_syntactic.append(train_syntactic_features[i])  # [(seq_l1, syn_size), (seq_l1, syn_size), ...]
+        temp_synctactic_l.append(temp_syntactic[-1].size(0))    # get seq_l
         if len(temp_sent) % argument_extraction_bsz == 0:
             train_sentences_batch.append(temp_sent)
             train_types_batch.append(temp_typ)
@@ -103,35 +105,11 @@ def simple_bachify_for_arguments(train_sentences, train_types, train_trigs, gts,
             # gt_starts, gt_ends = gt_starts.permute([0, 2, 1]), gt_ends.permute([0, 2, 1])   # (bsz, len(role_types), seq_l)
             train_gts_batch.append([gt_starts, gt_ends])  # both (bsz, len(role_types), seq_l)
             # pad syntactic features
-            #   pad [0] on segment feature, and pad [[0, 0, ..., 1], ] on postag and ner
-            max_l = max(temp_synctactic_l)
-            for s_i in range(len(temp_syntactic_segment)):
-                pad_l = max_l - temp_syntactic_segment[s_i].size()[0]
-                if pad_l == 0:
-                    continue
-                pad_tensor = torch.zeros(pad_l, 1)
-                temp_syntactic_segment[s_i] = torch.cat((temp_syntactic_segment[s_i], pad_tensor))  # all (max_l, 1)
-            for s_i in range(len(temp_syntactic_postag)):
-                pad_l = max_l - temp_syntactic_postag[s_i].size()[0]
-                if pad_l == 0:
-                    continue
-                pad_tensor = torch.cat([torch.zeros(pad_l, postag_feature_cnt), torch.ones(pad_l, 1)], dim=1)
-                temp_syntactic_postag[s_i] = torch.cat((temp_syntactic_postag[s_i], pad_tensor))    # all (max_l, pos_cnt)
-            for s_i in range(len(temp_syntactic_ner)):
-                pad_l = max_l - temp_syntactic_ner[s_i].size()[0]
-                if pad_l == 0:
-                    continue
-                pad_tensor = torch.cat([torch.zeros(pad_l, ner_feature_cnt), torch.ones(pad_l, 1)], dim=1)
-                temp_syntactic_ner[s_i] = torch.cat((temp_syntactic_ner[s_i], pad_tensor))  # all (max_l, ner_cnt)
-            # combine syntactic features for each sentence
-            for c_i in range(len(temp_syntactic_segment)):
-                seg, pos, ner = temp_syntactic_segment[c_i], temp_syntactic_postag[c_i], temp_syntactic_ner[c_i]
-                temp_syntactic_combine.append(torch.cat([seg, pos, ner], dim=1))
-            train_syntactic_batch.append(torch.stack(temp_syntactic_combine))
-            temp_sent, temp_typ, temp_trigs, temp_gt_starts, temp_gt_starts, temp_gt_ends, temp_syntactic_segment, temp_syntactic_postag, \
-            temp_syntactic_ner = [], [], [], [], [], [], [], [], []
-            temp_synctactic_l = []
-            temp_syntactic_combine = []
+            #   pad [0] on segment feature, and pad [[0, 0, ..., 1], ] on postag and ner todo 忘记这里为什么说要pad1了
+            padded_syntactic_feature = torch.nn.utils.rnn.pad_sequence(temp_syntactic, True, 0) # (bsz, seq_l, syn_size)
+            train_syntactic_batch.append(padded_syntactic_feature)
+            temp_sent, temp_typ, temp_trigs, temp_gt_starts, temp_gt_starts, temp_gt_ends = [], [], [], [], [], []
+            temp_syntactic = []
 
     return train_sentences_batch, train_types_batch, train_triggers_batch, train_gts_batch, train_syntactic_batch
 
@@ -316,8 +294,9 @@ def argument_extraction_reader():
     # Read Data
     data = read_file()
     matches = pickle.load(open('preprocess/matches.pk', 'rb'))
-    segment_feature_tensors, postag_feature_tensors, ner_feature_tensors, regex_proportion_tensors = pickle.load(
-        open('preprocess/syntactic_feature_tensors.pk', 'rb'))
+    # segment_feature_tensors, postag_feature_tensors, ner_feature_tensors, regex_proportion_tensors = pickle.load(
+    #     open('preprocess/syntactic_feature_tensors.pk', 'rb'))
+    syntactic_tensors = pickle.load(open('preprocess/syntactic_feature_tensors.pk', 'rb'))
 
     # Step 2
     # Find Data
@@ -330,10 +309,11 @@ def argument_extraction_reader():
         token2origin, origin2token = cur_match
         events = d['events']
         cur_id = d['id']
-        cur_segment_tensor = segment_feature_tensors[i]
-        cur_postag_tensor = postag_feature_tensors[i]
-        cur_ner_tensor = ner_feature_tensors[i]
-        cur_regex_pro_tensor = regex_proportion_tensors[i]
+        # cur_segment_tensor = segment_feature_tensors[i]
+        # cur_postag_tensor = postag_feature_tensors[i]
+        # cur_ner_tensor = ner_feature_tensors[i]
+        # cur_regex_pro_tensor = regex_proportion_tensors[i]
+        cur_syntactic_tensor = syntactic_tensors[i]
         cur_sentence = d['content'].lower().replace(' ', '_')
         type_dict = {}  # key:event type  value:[trigger_span1, trigger_span2, ...]
         argument_dict = {}  # key:event type value:[arg_lst1, arg_lst2] 与type_dict种的trigger_span相对应
@@ -366,7 +346,8 @@ def argument_extraction_reader():
             for idx, trig in enumerate(value):
                 sentences.append(cur_sentence)
                 ids.append(cur_id)
-                syntactic.append([cur_segment_tensor, cur_postag_tensor, cur_ner_tensor, cur_regex_pro_tensor])
+                # syntactic.append([cur_segment_tensor, cur_postag_tensor, cur_ner_tensor, cur_regex_pro_tensor])
+                syntactic.append(cur_syntactic_tensor)
                 types.append(key)
                 sent_match.append(cur_match)
                 trigger.append(trig)  # (start, end)
@@ -407,7 +388,7 @@ def argument_extraction_reader():
         , trigger[train_cnt:], arguments[train_cnt:], syntactic[train_cnt:]
     #   Step 4.2
     #   Prepare Training Data
-    #       delete bad data. Strategy:随机
+    #       delete bad data. Strategy:合并
     # temp_ids, temp_sentences, temp_types, temp_match, temp_triggers, temp_arguments, temp_syntactic_features = [], [], [], [], [], [], []
     # id_trigger_type_set = set()
     # for i, sentences in enumerate(train_sentences):
@@ -487,9 +468,7 @@ def argument_extraction_reader():
             else:
                 cur_argument_spans.append([])
         arg_spans.append(cur_argument_spans)
-        val_seg_feature, val_pos_feature, val_ner_feature = \
-            val_syntactic_features[i][0], val_syntactic_features[i][1], val_syntactic_features[i][2]
-        val_syns.append(torch.cat([val_seg_feature, val_pos_feature, val_ner_feature], dim=1).unsqueeze(dim=0))
+        val_syns.append(val_syntactic_features[i].unsqueeze(dim=0)) # (1, seq_l, syn_size)?
 
     pickle.dump([val_sentences, val_types, val_triggers, arg_spans, val_syns], open('val_data_for_argument_extraction.pk', 'wb'))
 
