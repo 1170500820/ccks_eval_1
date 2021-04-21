@@ -37,11 +37,11 @@ class ArgumentExtractionModel(nn.Module):
         if add_lstm:
             # FCN for trigger finding
             # origin + attn(origin) + syntactic + RPE
-            self.fcn_start = nn.Linear(self.hidden_size * 2, len(role_types))
-            self.fcn_end = nn.Linear(self.hidden_size * 2, len(role_types))
+            self.fcn_start = nn.Linear(self.hidden_size , len(role_types))
+            self.fcn_end = nn.Linear(self.hidden_size , len(role_types))
 
             # try to add a bi-LSTM layer
-            self.lstm = nn.LSTM(self.hidden_size * 2 + self.syntactic_size + 1, self.hidden_size,
+            self.lstm = nn.LSTM(self.hidden_size * 2 + self.syntactic_size + 1, self.hidden_size//2,
                                 batch_first=True, dropout=self.dropout_prob, bidirectional=True)
         else:
             # FCN for trigger finding
