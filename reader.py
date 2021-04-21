@@ -1,6 +1,8 @@
 import json
 from settings import *
 from transformers import BertTokenizer
+from preprocess.data_process import randomize, train_val_split, multi_train_val_split
+from preprocess.process_utils import *
 import torch
 import pickle
 import random
@@ -502,6 +504,86 @@ def argument_extraction_reader():
     pickle.dump([val_sentences, val_types, val_triggers, arg_spans, val_syns], open('val_data_for_argument_extraction.pk', 'wb'))
 
 
+def ner_reader():
+    ner_role_types = {
+        'obj-per',
+        'sub-org',
+        'obj',
+        'target-company',
+        'sub-per',
+        'sub',
+        'obj-org'
+    }
+    tokenizer = BertTokenizer.from_pretrained(model_path)
+    data = read_file()
+    matches = pickle.load(open('preprocess/matches.pk', 'rb'))
+
+    # Step 2
+    # Find and SortOut
+    tokenized, sentences, spans, token_spans = [], [], [], []
+    # the data be like:
+    # sent:     除 上 述 质 押 股 份 外 , 卓 众 达 富 持 有 的
+    #           0  1 2 |3  4|5  6 7  8 9 10 11 12 13 14 15
+    # trigger:  质押
+    # span:     3, 5
+    for i, d in enumerate(data):
+        token2origin, origin2token = matches[i]
+        sentences.append(d['content'])
+        tokenized.append(tokenizer(d['content'], truncation=True, padding=True, return_tensors='pt'))
+        span_set = set()
+        for e in d['events']:
+            for r in e['mentions']:
+                if r['role'] in ner_role_types:
+                    span_set.add(tuple(r['span']))
+        spans.append(list(span_set))
+        token_spans.append(list(map(lambda x: (origin2token[x[0]], origin2token[x[1] - 1]), spans[-1])))
+    # sentences: [sent_str1, sent_str2, ...]
+    # spans: [[(start1, end1), (start2, end2), ...], ...]
+    # matches: [[token2origin, origin2token], ...]
+    # tokenized: [{'input_ids': tensor, 'token_type_ids: tensor, 'attention_mask': tensor}, ...]
+    # len(sentences) == len(spans)
+    assert len(tokenized) == len(sentences) == len(spans) == len(matches) == len(token_spans)
+
+    # Step 3
+    # randomize
+    tokenized, sentences, spans, matches, token_spans = randomize(tokenized, sentences, spans, matches, token_spans)
+
+    # Step 4
+    # Prepare data
+    train_tokenized, train_sentences, train_spans, train_matches, train_token_spans, \
+    val_tokenized, val_sentences, val_spans, val_matches, val_token_spans = \
+        multi_train_val_split(tokenized, sentences, spans, matches, token_spans, split_ratio=train_val_split_ratio)
+    train_gt_tensors = []
+    for i, match in enumerate(train_matches):
+        token2origin, origin2token = match
+        token_l = len(token2origin)
+        labels = [0] * token_l
+        cur_token_spans = train_token_spans[i]
+        for span in cur_token_spans:
+            for k in range(span[0], span[1] + 1):
+                labels[k] = 1
+        train_gt_tensors.append(torch.tensor(labels, dtype=torch.float))
+
+    # Step 5
+    # Batchify
+    train_tokenized_batch, train_sentences_batch, train_spans_batch, train_matches_batch, train_token_spans_batch, train_gt_tensors_batch = \
+        batchify(train_tokenized, train_sentences, train_spans, train_matches, train_token_spans, train_gt_tensors, bsz=ner_bsz,
+                 lst_types=['dict_tensors', 'iterable', 'iterable', 'iterable', 'iterable', 'tensor'])
+
+    # Step 6
+    # Align training data with model
+    pickle.dump(train_tokenized_batch, open('train_input.pk', 'wb'))
+    pickle.dump(train_gt_tensors_batch, open('train_labels.pk', 'wb'))
+
+
+    # Step 7
+    # Align evaluating data with model
+    pickle.dump(val_tokenized, open('val_input.pk', 'wb'))
+    pickle.dump(val_spans, open('val_labels.pk', 'wb'))
+    
+
+
 if __name__ == '__main__':
     # trigger_extraction_reader()
-    argument_extraction_reader()
+    # argument_extraction_reader()
+    ner_reader()
