@@ -15,21 +15,21 @@ inner_model = True
 
 # Data Definitions
 role_types = [
-    # 'obj-per',  # 0
+    'obj-per',  # 0
     # 'amount',   # 1
     # 'title',    # 2
-    # 'sub-org',  # 3
+    'sub-org',  # 3
     # 'number',   # 4
     # 'way',      # 5
     # 'collateral',   # 6
-    # 'obj',      # 7
-    # 'target-company',   # 8
+    'obj',      # 7
+    'target-company',   # 8
     # 'share-org',    # 9
-    # 'sub-per',  # 10
-    # 'sub',      # 11
+    'sub-per',  # 10
+    'sub',      # 11
     # 'data',     # 12
-    # 'obj-org',  # 13
-    'proportion',   # 14
+    'obj-org',  # 13
+    # 'proportion',   # 14
     # 'date',     # 15
     # 'share-per',    # 16
     # 'institution',  # 17
@@ -163,6 +163,10 @@ sentence_representation_bsz = 4
 
 argument_extraction_bsz = 4
 
+ner_bsz = 4
+ner_lr = 2e-5
+ner_epoch = 30
+ner_threshold = 0.5
 
 # Eval
 train_val_split_ratio = 0.9
@@ -176,3 +180,7 @@ truncation_length = 255
 replace_word_select_ratio = 0.9 # 选择词频前多少的词进行mask替换
 mlm_bsz = 4
 batch_mult_cnt = 4  # 每多少次求一次loss，相当于将bsz增大了多少倍
+
+# label smoothing
+activate_label_smoothing = True
+label_smoothing_range = 3
