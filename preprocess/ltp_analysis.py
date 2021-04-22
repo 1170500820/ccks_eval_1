@@ -6,6 +6,8 @@ generate ltp analyze result and convert to tensor
 词性特征，对词性包含的所有token标记    (seq_l, 28) todo 一个token一定只属于一种词性吗
 ner特征，类似词性特征标记法 (seq_l, 10)
 """
+import sys
+sys.path.append('..')
 from pyltp import Segmentor, Postagger, NamedEntityRecognizer, Parser, SementicRoleLabeller
 import pickle
 import json
@@ -64,25 +66,27 @@ def generate_ltp_results():
 
     # 依存句法分析 todo 依存句法的分析结果是一棵树，无法直接拼接到embedding上，有办法吗。
     # todo 依然要做，因为依存句法分析是语义角色标注的前置
-    # parser = Parser()
-    # parser.load(modelpath + 'parser.model')
-    # arcs = [list(parser.parse(x, posed[i])) for (i, x) in enumerate(segmented)]
-    # parser.release()
+    parser = Parser()
+    parser.load(modelpath + 'parser.model')
+    arcs = [list(parser.parse(x, posed[i])) for (i, x) in enumerate(segmented)]
+    pickle.dump(arcs, open('arcs.pk', 'wb'))
+    parser.release()
 
 
     # 语义角色标注
-    # srl_labeller = SementicRoleLabeller()
-    # srl_labeller.load(modelpath + 'pisrl_win.model')
-    #
-    # roles = [list(srl_labeller.label(x, posed[i], arcs[i])) for (i, x) in enumerate(segmented)]
-    # srl_labeller.release()
+    srl_labeller = SementicRoleLabeller()
+    srl_labeller.load(modelpath + 'pisrl_win.model')
+
+    roles = [list(srl_labeller.label(x, posed[i], arcs[i])) for (i, x) in enumerate(segmented[:500])]
+    srl_labeller.release()
+    pickle.dump(roles, open('roles0-500.pk', 'wb'))
     #
     # print('1\n')
     # print_role(roles[0], segmented[0])
     # print('\n2\n')
     # print_role(roles[1], segmented[1])
 
-    # pickle.dump([segmented, posed, nered, roles], open('segmented_posed_nered_roles_0-500.pk', 'wb'))
+    # pickle.dump([segmented, posed, nered, arcs, roles], open('segmented_posed_nered_roles.pk', 'wb'))
     return data, segmented, posed, nered
 
 
