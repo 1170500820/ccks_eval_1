@@ -92,7 +92,7 @@ def train_event_detection(lr=3e-5, epoch=20, epoch_save_cnt=3, val=True, val_fre
                 model.train()
 
 
-def train_trigger_extraction(repr_lr=2e-5, tem_lr = 1e-4, epoch=20, epoch_save_cnt=3, val=True, val_freq=300, val_start_epoch=-1):
+def train_trigger_extraction(repr_lr=2e-5, tem_lr=1e-4, epoch=20, epoch_save_cnt=3, val=True, val_freq=300, val_start_epoch=-1):
     # Training Procedure Step - 1
     # Initiate model, model config, tokenizer, optimizer. Move models to devices
     config = BertConfig.from_pretrained('../' + model_path)
@@ -401,6 +401,63 @@ def train_argument_extraction(
             torch.save(trigger_repr_model.state_dict(), save_file_name + '_epoch-' + str(i_epoch + 1) + '_trigger-repr-model' + '.pt')
             torch.save(aem.state_dict(), save_file_name + '_epoch-' + str(i_epoch + 1) + '_aem' + '.pt')
             torch.save(repr_model.state_dict(), save_file_name + '_epoch-' + str(i_epoch + 1) + '_repr-model' + '.pt')
+
+
+def train_regular_model(lr=None,
+                        epoch=None,
+                        save_freq=None,
+                        eval_freq=None,
+                        model=None,
+                        train_inputs=None,
+                        train_labels=None,
+                        val_inputs=None,
+                        val_labels=None,
+                        loss_function=None,
+                        recorder=None):
+    """
+    a regular train proccess
+    :param lr:
+    :param save_freq:
+    :param train_labels:
+    :param train_inputs:
+    :param val_inputs:
+    :param val_labels:
+    :param eval_freq:
+    :param epoch: how many epoch to train the model
+    :param model: outputs = model(**inputs[i_batch])
+    :param optimizer:
+    :param loss_function: loss = loss_function(**outputs, **labels[i_batch])
+    :param recorder: recorder.record(**outputs), a recorder is initiated with evaluate set labels
+    :return:
+    """
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model.to(device)
+    optimizer = AdamW(model.parameters(), lr=lr)
+    for i_epoch in range(epoch):
+        model.train()
+        for i_batch, batch_ in enumerate(train_inputs):
+            label = train_labels[i_batch]
+            model.zero_grad()
+            output = model(**batch_)
+            loss = loss_function(**output, **label)
+            loss.backward()
+            optimizer.step()
+
+            # evaluate
+            if (i_batch + 1) % eval_freq == 0:
+                model.eval()
+                val_outputs = []
+                for i_val, val_input in tqdm(list(enumerate(val_inputs))):
+                    val_output = model(**val_input)
+                    val_outputs.append(recorder.logits2span(**val_output))
+                # todo convert output tensor to spans or tags
+                recorder.record(val_outputs)
+                info_str = recorder.evaluate()
+                print(info_str)
+                model.train()
+        if (i_epoch + 1) % save_freq == 0:
+            # save models
+            pass
 
 
 if __name__ == '__main__':
