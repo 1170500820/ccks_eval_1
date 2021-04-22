@@ -1,7 +1,8 @@
-from settings import role_types, model_path, inner_model
+from settings import role_types, model_path, inner_model, ner_threshold
 import numpy as np
 import pickle
 from transformers import BertTokenizer
+import torch
 
 
 def score_argument_extraction(sentence: str, sentence_types: str, predict_spans: [[(int, int), ], ], ground_truth_spans: [[(int, int)], ]):
@@ -61,6 +62,30 @@ def show_argument_extraction_badcase():
 #             ws.append(w)
 #         print(f'result {i + 1}:{ws}')
 
+def get_total_find_f1(gt: [[], ], result: [[], ]):
+    """
+    忽略实体类别，仅考虑找出来的f1
+    :param gt:
+    :param result:
+    :return:
+    """
+    gt_sets, result_sets = set(), set()
+    for g in gt:
+        for sp in g:
+            gt_sets.add(sp)
+    for r in result:
+        for sp in r:
+            result_sets.add(sp)
+    total = len(gt_sets)
+    predict = len(result_sets)
+    correct = len(gt_sets.intersection(result_sets))
+    precision = correct / predict if predict != 0 else 0
+    recall = correct / total if total != 0 else 0
+    f1 = 2 * precision * recall / (precision + recall) if precision + recall != 0 else 0
+    if total == predict == 0:
+        f1 = 1
+    return f1
+
 
 class EvalRecord:
     def __init__(self, ground_truth_spans):
@@ -73,6 +98,9 @@ class EvalRecord:
         self.sentences, self.contains_sentences = [], False
         self.types, self.contains_types = [], False
         self.trigger_span, self.contains_trigger_span = [], False
+
+        self.val_sentences, self.val_types, self.val_triggers, self.arg_spans, self.val_syns = [], [], [], [], []
+        self.load_val_data()
 
     def add_sentences(self, sentences: [str, ]):
         self.sentences = sentences
@@ -131,8 +159,12 @@ class EvalRecord:
     def ranklist(self):
         return np.array(self.scores).mean(axis=0).argsort().tolist()
 
-    def show(self, sample_idx):
-        pass
+    def scorelist(self):
+        """
+        return sorted score
+        :return:
+        """
+        return np.array(self.scores).mean(axis=0).sort().tolist()
 
     def save(self, filename):
         pickle.dump([self.scores, self.result_spans, self.ground_truth_spans], open(filename, 'wb'))
@@ -144,3 +176,71 @@ class EvalRecord:
         r.scores = scores
         r.result_spans = result_spans
         return r
+
+    def load_val_data(self):
+        self.val_sentences, self.val_types, self.val_triggers, self.arg_spans, self.val_syns = \
+            pickle.load(open('../val_data_for_argument_extraction.pk', 'rb'))
+
+    def show(self, number, recent=15):
+        tokens = self.tokenizer.convert_ids_to_tokens(self.tokenizer(self.val_sentences[number])['input_ids'])[1:]
+        gts = self.arg_spans[number]
+        gt_words = []
+        for gt in gts:
+            gt_word = list(map(lambda x: (x, ''.join(tokens[x[0]: x[1] + 1])), gt))
+            gt_words.append(gt_word)
+        results = []
+        for i in range(recent):
+            results.append([])
+            for j in range(len(gt_words)):
+                results[-1].append(self.result_spans[39 - i][number][j])
+        print(f'origin sentence:{self.val_sentences[number]}')
+        print(f'Tokens:{tokens}')
+        print(f'Type:{self.val_types[number]}')
+        print(f'Trigger:{(self.val_triggers[number], tokens[self.val_triggers[number][0]: self.val_triggers[number][1] + 1])}')
+        print(f'gt span:{gt_words}')
+        for i in range(recent):
+            ws = []
+            for k in range(len(gt_words)):
+                w = list(map(lambda x: (x, ''.join(tokens[x[0]: x[1] + 1])), results[i][k]))
+                ws.append(w)
+            print(f'result {i + 1}:{ws}')
+
+
+class NerEvalRecorder:
+    def __init__(self, gt):
+        self.span = []
+        self.gt = gt
+
+    def record(self, spans: []):
+        self.span.append(spans)
+
+    @staticmethod
+    def logits2span(logits=None):
+        """
+        在EvalRecorder父类中，应该是logits2label
+        统一的是将模型的输出转化为label容易分辨的格式
+        最好与从数据中直接读取的格式相同且足够简单
+        这样就能够防止label格式过多而难以管理
+        :param logits: (1, seq_l, 2)
+        :return:
+        """
+        return torch.max(logits.squeeze(), dim=1).indices.tolist()
+
+    def evaluate(self):
+        """
+        evaluate self.span[-1] and self.gt
+        :return:
+        """
+        total, predict, correct = 0, 0, 0
+        for i, g in enumerate(self.gt):
+            s = self.span[-1][i]
+            gt_set, result_set = set(g), set(s)
+            total += len(gt_set)
+            predict += len(result_set)
+            correct += len(gt_set.intersection(result_set))
+
+        precision = correct / predict if predict != 0 else 0
+        recall = correct / total if total != 0 else 0
+        f = 2 * precision * recall / (precision + recall)
+        s = f"total:{total}, predict:{predict}, correct:{correct}, precision:{precision}, recall:{recall}, f1:{f}"
+        return s
