@@ -2,7 +2,9 @@ from settings import role_types, model_path, inner_model, ner_threshold
 import numpy as np
 import pickle
 from transformers import BertTokenizer
+from evaluate.eval_utils import argument_span_determination
 import torch
+
 
 
 def score_argument_extraction(sentence: str, sentence_types: str, predict_spans: [[(int, int), ], ], ground_truth_spans: [[(int, int)], ]):
@@ -91,6 +93,8 @@ class EvalRecord:
     def __init__(self, ground_truth_spans):
         self.scores = []
         self.result_spans = []
+        self.measures = []
+        self.precisions, self.recalls, self.f1s = [], [], []
         self.ground_truth_spans = ground_truth_spans
         self.avg_scores = []
         self.tokenizer = BertTokenizer.from_pretrained(model_path)
@@ -130,6 +134,15 @@ class EvalRecord:
         self.scores[-1].append(score)
         self.result_spans[-1].append(predict_span)
 
+    def record_measures(self, timestep, total, predict, correct):
+        self.measures.append((total, predict, correct))
+        recall = correct / total if total != 0 else 0
+        precision = correct / predict if predict != 0 else 0
+        f_measure = (2 * recall * precision) / (recall + precision) if recall + precision != 0 else 0
+        self.precisions.append(precision)
+        self.recalls.append(recall)
+        self.f1s.append(f_measure)
+
     def inquire_gt(self, sample_idx):
         """
         查询某一个sample的gt
@@ -166,15 +179,28 @@ class EvalRecord:
         """
         return np.array(self.scores).mean(axis=0).sort().tolist()
 
+    def summarize(self, num=20) -> str:
+        """
+        输出总结信息
+        :return:
+        """
+        f1_np = np.array(self.f1s[-num: ])
+        max_f1 = max(self.f1s)
+        mean_f1 = f1_np.mean()
+        string = f'最大f1:{max_f1}\n后{num}次评价的平均f1{mean_f1}'
+        return string
+
+
     def save(self, filename):
-        pickle.dump([self.scores, self.result_spans, self.ground_truth_spans], open(filename, 'wb'))
+        pickle.dump([self.scores, self.measures, self.result_spans, self.ground_truth_spans], open(filename + '.' + str(len(self.measures)), 'wb'))
 
     @staticmethod
     def from_file(filename):
-        scores, result_spans, ground_truth_spans = pickle.load(open(filename, 'rb'))
+        scores, measure, result_spans, ground_truth_spans = pickle.load(open(filename, 'rb'))
         r = EvalRecord(ground_truth_spans)
         r.scores = scores
         r.result_spans = result_spans
+        r.measures = measure
         return r
 
     def load_val_data(self):
@@ -209,22 +235,35 @@ class EvalRecord:
 class NerEvalRecorder:
     def __init__(self, gt):
         self.span = []
+        self.measures = []  # 存放评价指标
         self.gt = gt
 
-    def record(self, spans: []):
+    def record(self, spans: [], i_epoch, i_batch):
         self.span.append(spans)
+        self.measures.append(None)
 
     @staticmethod
-    def logits2span(logits=None):
+    def logits2span(results=None):
         """
         在EvalRecorder父类中，应该是logits2label
         统一的是将模型的输出转化为label容易分辨的格式
         最好与从数据中直接读取的格式相同且足够简单
         这样就能够防止label格式过多而难以管理
-        :param logits: (1, seq_l, 2)
+        :param results: [(1, seq_l, 1), (1, seq_l, 1)]
         :return:
         """
-        return torch.max(logits.squeeze(), dim=1).indices.tolist()
+        starts, ends = torch.sigmoid(results[0].squeeze()), torch.sigmoid(results[1].squeeze())
+        start_results, end_results = (starts > ner_threshold).long().tolist(), (ends > ner_threshold).long().tolist()
+        span = argument_span_determination(start_results, end_results, starts, ends)
+        return list(map(tuple, span))
+
+    @staticmethod
+    def convert(logits=None):
+        return NerEvalRecorder.logits2span(logits=logits)
+
+    @staticmethod
+    def score(predict, gt):
+        pass
 
     def evaluate(self):
         """
@@ -241,6 +280,7 @@ class NerEvalRecorder:
 
         precision = correct / predict if predict != 0 else 0
         recall = correct / total if total != 0 else 0
-        f = 2 * precision * recall / (precision + recall)
+        f = 2 * precision * recall / (precision + recall) if precision + recall != 0 else 0
         s = f"total:{total}, predict:{predict}, correct:{correct}, precision:{precision}, recall:{recall}, f1:{f}"
-        return s
+        self.measures[-1] = (precision, recall, f)
+        return (precision, recall, f), s
