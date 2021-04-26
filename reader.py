@@ -7,6 +7,7 @@ import torch
 import pickle
 import random
 import torch.nn.functional as F
+from itertools import chain
 
 
 def read_file(filepath=train_file_path):
@@ -528,8 +529,8 @@ def ner_reader():
     # span:     3, 5
     for i, d in enumerate(data):
         token2origin, origin2token = matches[i]
-        sentences.append(d['content'])
-        tokenized.append(tokenizer(d['content'], truncation=True, padding=True, return_tensors='pt'))
+        sentences.append(d['content'].replace(' ', '_').lower())
+        tokenized.append(tokenizer(d['content'].replace(' ', '_').lower(), truncation=True, padding=True, return_tensors='pt'))
         span_set = set()
         for e in d['events']:
             for r in e['mentions']:
@@ -553,23 +554,30 @@ def ner_reader():
     train_tokenized, train_sentences, train_spans, train_matches, train_token_spans, \
     val_tokenized, val_sentences, val_spans, val_matches, val_token_spans = \
         multi_train_val_split(tokenized, sentences, spans, matches, token_spans, split_ratio=train_val_split_ratio)
-    train_gt_tensors = []
+    train_gt_start_tensors, train_gt_end_tensors = [], []
     for i, match in enumerate(train_matches):
         token2origin, origin2token = match
         token_l = len(token2origin)
-        labels = [0] * token_l
+        start_labels = [0] * token_l
+        end_labels = [0] * token_l
         cur_token_spans = train_token_spans[i]
         for span in cur_token_spans:
-            for k in range(span[0], span[1] + 1):
-                labels[k] = 1
-        train_gt_tensors.append(torch.tensor(labels, dtype=torch.float))
+            start_labels[span[0]] = 1
+            end_labels[span[1]] = 1
+        start_labels_tensor, end_labels_tensor = torch.tensor(start_labels, dtype=torch.float), torch.tensor(end_labels, dtype=torch.float)
+        if end_labels_tensor.size(0) != train_tokenized[i]['input_ids'].size(1):
+            print('出大问题了')
+        train_gt_end_tensors.append(end_labels_tensor)
+        train_gt_start_tensors.append(start_labels_tensor)
 
     # Step 5
     # Batchify
-    train_tokenized_batch, train_sentences_batch, train_spans_batch, train_matches_batch, train_token_spans_batch, train_gt_tensors_batch = \
-        batchify(train_tokenized, train_sentences, train_spans, train_matches, train_token_spans, train_gt_tensors, bsz=ner_bsz,
-                 lst_types=['dict_tensors', 'iterable', 'iterable', 'iterable', 'iterable', 'tensor'])
-
+    train_tokenized_batch, train_sentences_batch, train_spans_batch, train_matches_batch, train_token_spans_batch, train_gt_start_tensors_batch, train_gt_end_tensors_batch = \
+        batchify(train_tokenized, train_sentences, train_spans, train_matches, train_token_spans, train_gt_start_tensors, train_gt_end_tensors, bsz=ner_bsz,
+                 lst_types=['dict_tensors', 'iterable', 'iterable', 'iterable', 'iterable', 'tensor', 'tensor'])
+    # mid step
+    # convert gt to dict of gt
+    train_gt_tensors_batch = list(map(lambda x: {'gt_label': [x[1], train_gt_end_tensors_batch[x[0]]]}, enumerate(train_gt_start_tensors_batch)))
     # Step 6
     # Align training data with model
     pickle.dump(train_tokenized_batch, open('train_input.pk', 'wb'))
@@ -579,11 +587,33 @@ def ner_reader():
     # Step 7
     # Align evaluating data with model
     pickle.dump(val_tokenized, open('val_input.pk', 'wb'))
-    pickle.dump(val_spans, open('val_labels.pk', 'wb'))
+    pickle.dump(val_token_spans, open('val_labels.pk', 'wb'))
     
+
+def continue_pretrain_reader():
+    train_base = read_file('data/train_base.json')
+    train_dev = read_file('data/trans_dev.json')
+    trans_base = read_file('data/trans_train.json')
+    trans_dev = read_file('data/trans_dev.json')
+
+    train_base_sent = list(map(lambda x: x['content'], train_base))
+    train_dev_sent = list(map(lambda x: x['content'], train_dev))
+    trans_base_sent = list(map(lambda x: x['content'], trans_base))
+    trans_dev_sent = list(map(lambda x: x['content'], trans_dev))
+    sentences = list(chain(trans_base_sent, trans_dev_sent, train_dev_sent, train_base_sent))
+
+    # 去除长度大于256的句子
+    max_len = 256
+    sentences = list(filter(lambda x: len(x) <= max_len, sentences))
+
+    f = open('continue_pretrain_le256_no-doc-divide.txt', 'w', encoding='utf-8')
+    for sent in sentences:
+        f.write(sent + '\n')
+    f.close()
 
 
 if __name__ == '__main__':
     # trigger_extraction_reader()
     # argument_extraction_reader()
-    ner_reader()
+    # ner_reader()
+    continue_pretrain_reader()
