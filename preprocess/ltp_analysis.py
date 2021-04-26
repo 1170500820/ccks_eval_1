@@ -9,12 +9,14 @@ ner特征，类似词性特征标记法 (seq_l, 10)
 import sys
 sys.path.append('..')
 from pyltp import Segmentor, Postagger, NamedEntityRecognizer, Parser, SementicRoleLabeller
+from ltp import LTP
 import pickle
 import json
 from tqdm import tqdm
 import torch
-from settings import *
+from settings import ner_tags, pos_tags, percentage_regex
 import re
+from tqdm import tqdm
 
 
 def read_file_in_ltp(filepath):
@@ -69,17 +71,16 @@ def generate_ltp_results():
     parser = Parser()
     parser.load(modelpath + 'parser.model')
     arcs = [list(parser.parse(x, posed[i])) for (i, x) in enumerate(segmented)]
-    pickle.dump(arcs, open('arcs.pk', 'wb'))
     parser.release()
 
 
     # 语义角色标注
-    srl_labeller = SementicRoleLabeller()
-    srl_labeller.load(modelpath + 'pisrl_win.model')
-
-    roles = [list(srl_labeller.label(x, posed[i], arcs[i])) for (i, x) in enumerate(segmented[:500])]
-    srl_labeller.release()
-    pickle.dump(roles, open('roles0-500.pk', 'wb'))
+    # srl_labeller = SementicRoleLabeller()
+    # srl_labeller.load(modelpath + 'pisrl_win.model')
+    #
+    # roles = [list(srl_labeller.label(x, posed[i], arcs[i])) for (i, x) in enumerate(segmented[:500])]
+    # srl_labeller.release()
+    # pickle.dump(roles, open('roles0-500.pk', 'wb'))
     #
     # print('1\n')
     # print_role(roles[0], segmented[0])
@@ -87,7 +88,48 @@ def generate_ltp_results():
     # print_role(roles[1], segmented[1])
 
     # pickle.dump([segmented, posed, nered, arcs, roles], open('segmented_posed_nered_roles.pk', 'wb'))
-    return data, segmented, posed, nered
+    return data, segmented, posed, nered, arcs
+
+
+def new_generate_ltp_results():
+    # 加载模型
+    ltp_model = '../../ltp_models/base1'
+    ltp = LTP(path=ltp_model)
+
+    # 读取原句子
+    data = read_file_in_ltp('../data/train_base.json')
+    sentences = list(map(lambda x: x['content'], data))
+
+    segmented, pos, ner, srl, dep, sdp_tree, sdp_graph = [], [], [], [], [], [], []
+    for sent in tqdm(sentences):
+        # 分词
+        segmented0, hidden = ltp.seg([sent])
+        # 词性标注
+        cur_pos = ltp.pos(hidden)
+        # 命名实体识别
+        cur_ner = ltp.ner(hidden)
+        # 语义角色标注
+        cur_srl = ltp.srl(hidden)
+        # 依存句法分析
+        cur_dep = ltp.dep(hidden)
+        # 语义依存分析 (树)
+        cur_sdp_tree = ltp.sdp(hidden, mode='tree')
+        # 语义依存分析 (图)
+        cur_sdp_graph = ltp.sdp(hidden, mode='graph')
+
+        segmented.append(segmented0[0])
+        pos.append(cur_pos[0])
+        ner.append(cur_ner[0])
+        srl.append(cur_srl[0])
+        dep.append(cur_dep[0])
+        sdp_tree.append(cur_sdp_tree[0])
+        sdp_graph.append(cur_sdp_graph[0])
+
+        # 生成句子与分词的对应
+    sent_seg_matches = sentence_segment_match(data, segmented)
+    pickle.dump([segmented, pos, ner, srl, dep, sdp_tree, sdp_graph, sent_seg_matches], open('new_ltp_results.pk', 'wb'))
+
+    return segmented, pos, ner, srl, dep, sdp_tree, sdp_graph, sent_seg_matches
 
 
 def sentence_segment_match(o_data, segments):
@@ -211,6 +253,105 @@ def generate_ner_features(nertags, sent_seg_matches, matches):
     return features
 
 
+def tags2feature(tags: [str, ], sent_seg_matches, matches, tag_list):
+    """
+    token_l为该句子tokenize后去除CLS与SEP后的长度
+    len(tag_list)为所有该类型tag的个数
+    因为存在未知tag，所以未知tag统一被映射到最后一位 表示
+    因此生成的矩阵(token_l, len(tag_list) + 1)
+    每个列向量是对应token的独热类型表示
+
+    整个过程是segment -> char -> tokens
+    可以分两步进行
+    :param tags: 该句子与分词结果所对应的tag列表:len(tag) == len(segmented)
+    :param sent_seg_matches: 该句子的分词与字符的对应dict
+    :param matches: 该句子的字符与token的对应dict
+    :param tag_list: 该类型tag的坐标列表
+    :return: tensor: (token_l, len(tag_list) + 1)
+    """
+    segment2sentence, sentence2segment = sent_seg_matches
+    token2origin, origin2token = matches
+    matrix = torch.zeros(len(token2origin) - 2, len(tag_list) + 1, dtype=torch.float)
+
+    # 先转化为char的tag list
+    char_tag_list = ['UNK'] * len(sentence2segment)
+    for i, tag in enumerate(tags):
+        for idx in segment2sentence[i]:
+            char_tag_list[idx] = tag
+
+    # 再写入matrix
+    for i, tag in enumerate(char_tag_list):
+        tag_idx = -1
+        if tag in tag_list:
+            tag_idx = tag_list.index(tag)
+        matrix[origin2token[i] - 1][tag_idx] = 1
+    return matrix
+
+
+def ner2tag(ner_elem, segment_l):
+    """
+    将ltp的ner标注结果转化为可以输入tags2feature的tags列表
+    :param ner_elem: [(ner tag, start, end), ]
+    :param segment_l: length of segments
+    :return: ner tag
+    """
+    tags = ['UNK'] * segment_l
+    for elem in ner_elem:
+        for idx in range(elem[1], elem[2] + 1):
+            tags[idx] = elem[0]
+    return tags
+
+
+def pos2tag(pos_elem):
+    """
+    将ltp的pos标注结果转化为可以输入tags2feature的tags列表
+    :param pos_elem: [pos1 str, pos2 str, pos3 str, ...]
+    :return:
+    """
+    return pos_elem
+
+
+def srl2tag(srl_elem, segment_l):
+    """
+    将srl标注结果转化为tags列表
+    由于srl据有树结构，因此会返回两个长度均为segment_l的tags列表
+    其中第一个列表是head，第二个是角色
+    :param srl_elem:
+    :param segment_l:
+    :return:
+    """
+    assert len(srl_elem) == segment_l, 'ltp一定会处理成长度相等'
+    head_tags, srl_tags = ['UNK'] * segment_l, ['UNK'] * segment_l
+    for i, x in enumerate(srl_elem):
+        if len(x) != 0:
+            head_tags[i] = 'HEAD'
+            for elem in x:
+                for idx in range(elem[1], elem[2] + 1):
+                    srl_tags[idx] = elem[0]
+    return head_tags, srl_tags
+
+
+def dep2tag(dep_elem, segment_l):
+    """
+    依存句法也是树结构，因此返回两个tags列表
+    按照ltp提取的tuple的顺序，在左为主，在右为客
+    先返回主，后返回客
+
+    注意，sdpTree与dep的结构相同，因此也直接用这个函数处理了
+    sdpGraph包含重复，目前暂时先不实现Graph转换为tags todo
+    :param dep_elem:
+    :param segment_l:
+    :return:
+    """
+    assert len(dep_elem) == segment_l, 'ltp一定会处理成长度相等'
+    sub_tags, obj_tags = ['UNK'] * segment_l, ['UNK'] * segment_l
+    for i, elem in enumerate(dep_elem):
+        sub_tags[i] = elem[0]
+        if elem[1] != 0:
+            obj_tags[elem[1] - 1] = elem[2]
+    return sub_tags, obj_tags
+
+
 def generate_regex_feature(data, regex_str, matches):
     """
     1 at matched area, 0 at unmatched
@@ -236,7 +377,8 @@ def generate_regex_feature(data, regex_str, matches):
 
 
 if __name__ == '__main__':
-    data, segmented, posed, nered = generate_ltp_results()
+    segmented, pos, ner, srl, dep, sdp_tree, sdp_graph, sent_seg_matches = new_generate_ltp_results()
+    data, segmented, posed, nered, arcs = generate_ltp_results()
     matches = pickle.load(open('matches.pk', 'rb'))
     segment_features = generate_segment_feature(data, segmented, matches)
     sentence_segment_matches = sentence_segment_match(data, segmented)
