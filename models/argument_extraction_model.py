@@ -34,6 +34,8 @@ class ArgumentExtractionModel(nn.Module):
 
         self.self_attn = SelfAttn(self.n_head, self.d_head, self.hidden_size, self.dropout_prob)
 
+        self.syntactic_embed = nn.Linear(self.syntactic_size, self.syntactic_size, bias=False)
+
         if add_lstm:
             # FCN for trigger finding
             # origin + attn(origin) + syntactic + RPE
@@ -54,6 +56,7 @@ class ArgumentExtractionModel(nn.Module):
     def init_weights(self):
         torch.nn.init.xavier_uniform(self.fcn_start.weight)
         torch.nn.init.xavier_uniform(self.fcn_end.weight)
+        torch.nn.init.xavier_uniform(self.syntactic_embed.weight)
         self.fcn_start.bias.data.fill_(0)
         self.fcn_end.bias.data.fill_(0)
 
@@ -67,7 +70,7 @@ class ArgumentExtractionModel(nn.Module):
         """
         # self attention (multihead attention)
         attn_out = self.self_attn(cln_embeds)
-
+        syntactic_structure = self.syntactic_embed(syntactic_structure)
         # concatenation
         if self.skip_attn:
             attn_out = torch.zeros(attn_out.size()).cuda()
@@ -131,3 +134,4 @@ class FullAEM(nn.Module):
               model_input['gt']
         h_styp = self.repr_model(sentence_batch, type_batch)
         h_styp, RPE = self.trigger_repr_model(h_styp, trigger_batch)
+
