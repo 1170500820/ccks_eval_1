@@ -6,8 +6,8 @@ train_file_path = 'data/train_base.json'
 test_file_path = 'data/dev_base.json'
 train_trans_file_path = 'data/trans_train.json'
 test_trans_file_path = 'data/trans_dev.json'
-# model_path = '../RoBERTa_zh_Large_PyTorch'
-model_path = 'bert-base-chinese'
+model_path = '../../RoBERTa_zh_Large_PyTorch'
+# model_path = 'bert-base-chinese'
 # model_path = '../chinese_wwm_pytorch'
 # model_path = '../chinese_wwm_ext_pytorch'
 # model_path = '../chinese_wwm_ext_pytorch_ContTrain_epoch_1_batch_500_bsz_4'
@@ -16,24 +16,24 @@ inner_model = True
 # Data Definitions
 role_types = [
     'obj-per',  # 0
-    # 'amount',   # 1
-    # 'title',    # 2
+    'amount',   # 1
+    'title',    # 2
     'sub-org',  # 3
-    # 'number',   # 4
-    # 'way',      # 5
-    # 'collateral',   # 6
+    'number',   # 4
+    'way',      # 5
+    'collateral',   # 6
     'obj',      # 7
     'target-company',   # 8
-    # 'share-org',    # 9
+    'share-org',    # 9
     'sub-per',  # 10
     'sub',      # 11
-    # 'data',     # 12
+    'data',     # 12
     'obj-org',  # 13
-    # 'proportion',   # 14
-    # 'date',     # 15
-    # 'share-per',    # 16
-    # 'institution',  # 17
-    # 'money'     # 18
+    'proportion',   # 14
+    'date',     # 15
+    'share-per',    # 16
+    'institution',  # 17
+    'money'     # 18
 ]
 role_index = {v: i for i, v in enumerate(role_types)}
 event_types_init = [
@@ -106,6 +106,7 @@ ltp_feature_cnt_fixed = ltp_feature_cnt + 2 # todo pos与ner分别加入两个�
 
 pos_tags = ['a', 'b', 'c', 'd', 'e', 'g', 'h', 'i', 'j', 'k', 'm', 'n', 'nd', 'nh', 'ni', 'nl', 'ns', 'nt', 'nz', 'o',
             'p', 'q', 'r', 'u', 'v', 'wp', 'ws', 'x', 'z']
+
 pos_tags_index = {i: x for (i, x) in enumerate(pos_tags)}
 
 ner_tags = [
@@ -123,7 +124,153 @@ ner_tags = [
     'I-Ns',
     'O',
 ]
+ner_tags = ['Nh', 'Ni', 'Ns']
 ner_tags_index = {i: x for (i, x) in enumerate(ner_tags)}
+
+srl_heads = ['HEAD']
+srl_tags = [
+    'A0', 'A0-ADV', 'A0-CRD', 'A0-PRD', 'A0-PSE', 'A0-PSR', 'A1', 'A1-CRD', 'A1-FRQ', 'A1-PRD', 'A1-PSE', 'A1-PSR',
+    'A1-QTY', 'A2', 'A2-CRD', 'A2-PSE', 'A2-PSR', 'A2-QTY', 'A3', 'A4', 'ARGM-ADV', 'ARGM-BNF', 'ARGM-CND', 'ARGM-CRD',
+    'ARGM-DGR', 'ARGM-DIR', 'ARGM-DIS', 'ARGM-EXT', 'ARGM-FRQ', 'ARGM-LOC', 'ARGM-MNR', 'ARGM-PRD', 'ARGM-PRP',
+    'ARGM-TMP', 'ARGM-TPC', 'rel-DIS', 'rel-EXT']
+srl_tags_index = {i: x for (i, x) in enumerate(srl_tags)}
+
+dep_tags = [
+    'ADV',
+     'ATT',
+     'CMP',
+     'COO',
+     'DBL',
+     'FOB',
+     'HED',
+     'IOB',
+     'LAD',
+     'POB',
+     'RAD',
+     'SBV',
+     'VOB',
+     'WP']
+dep_tag_index = {i: x for (i, x) in enumerate(dep_tags)}
+
+sdpTree_tags = [
+    'AGT',
+     'CONT',
+     'DATV',
+     'EXP',
+     'FEAT',
+     'LINK',
+     'LOC',
+     'MANN',
+     'MATL',
+     'MEAS',
+     'PAT',
+     'REAS',
+     'Root',
+     'SCO',
+     'STAT',
+     'TIME',
+     'TOOL',
+     'dAGT',
+     'dCONT',
+     'dDATV',
+     'dEXP',
+     'dFEAT',
+     'dLINK',
+     'dLOC',
+     'dMANN',
+     'dMATL',
+     'dMEAS',
+     'dPAT',
+     'dREAS',
+     'dSCO',
+     'dSTAT',
+     'dTIME',
+     'dTOOL',
+     'eCOO',
+     'ePREC',
+     'eSUCC',
+     'mDEPD',
+     'mNEG',
+     'mPUNC',
+     'mRELA',
+     'rAGT',
+     'rCONT',
+     'rDATV',
+     'rEXP',
+     'rFEAT',
+     'rLINK',
+     'rLOC',
+     'rMANN',
+     'rMATL',
+     'rMEAS',
+     'rPAT',
+     'rREAS',
+     'rSCO',
+     'rSTAT',
+     'rTIME',
+     'rTOOL']
+sdpTree_tags_index = {i: x for (i, x) in enumerate(sdpTree_tags)}
+
+sdpGraph_tags = [
+    'AGT',
+     'CONT',
+     'DATV',
+     'EXP',
+     'FEAT',
+     'LINK',
+     'LOC',
+     'MANN',
+     'MATL',
+     'MEAS',
+     'PAT',
+     'REAS',
+     'Root',
+     'SCO',
+     'STAT',
+     'TIME',
+     'TOOL',
+     'dAGT',
+     'dCONT',
+     'dDATV',
+     'dEXP',
+     'dFEAT',
+     'dLINK',
+     'dLOC',
+     'dMANN',
+     'dMATL',
+     'dMEAS',
+     'dPAT',
+     'dREAS',
+     'dSCO',
+     'dSTAT',
+     'dTIME',
+     'dTOOL',
+     'eCOO',
+     'ePREC',
+     'eSUCC',
+     'mDEPD',
+     'mNEG',
+     'mPUNC',
+     'mRELA',
+     'rAGT',
+     'rCONT',
+     'rDATV',
+     'rEXP',
+     'rFEAT',
+     'rLINK',
+     'rLOC',
+     'rMANN',
+     'rMATL',
+     'rMEAS',
+     'rPAT',
+     'rREAS',
+     'rSCO',
+     'rSTAT',
+     'rTIME',
+     'rTOOL'
+]
+sdpGraph_tags_index = {i: x for (i, x) in enumerate(sdpGraph_tags)}
+
 
 n_head = 6
 d_head = 1024
@@ -161,7 +308,7 @@ event_detection_model = 'bert'
 
 sentence_representation_bsz = 4
 
-argument_extraction_bsz = 4
+argument_extraction_bsz = 8
 
 ner_bsz = 4
 ner_lr = 2e-5
