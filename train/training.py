@@ -241,15 +241,17 @@ def train_argument_extraction(
         aem_lr=1e-4,
         epoch=50,
         epoch_save_freq=12,
-        save_start_epoch=12,
+        save_start_epoch=100,
         save_file_name='default',
         val=True,
         loss_freq=10,
         val_freq=20,
         val_start_epoch=1,
+        use_cuda_1=True,
         inner_model=True,
         save_eval=False,
         record_save_epoch=6,
+        record_name='ccks',
         smooth=activate_label_smoothing):
     """
 
@@ -266,6 +268,11 @@ def train_argument_extraction(
     """
     # Step 1
     # Initiate model, model config, tokenizer and optimizer, Move models to devices
+    if not use_cuda_1:
+        pass
+    else:
+        import os
+        os.environ["CUDA_VISIBLE_DEVICED"] = '1'
     path_prefix = '../' if not inner_model else ''
     config = BertConfig.from_pretrained(path_prefix + model_path)
     rfief = pickle.load(open('rfief.pk', 'rb'))
@@ -384,6 +391,7 @@ def train_argument_extraction(
                 recall = correct / total if total != 0 else 0
                 precision = correct / predict if predict != 0 else 0
                 f_measure = (2 * recall * precision) / (recall + precision) if recall + precision != 0 else 0
+                record.record_measures(eval_timestep, total, predict, correct)
                 print(
                     f'total:{total} predict:{predict}, correct:{correct}, precision:{precision}, recall:{recall}, f:{f_measure}')
                 eval_result.append((i_epoch + 1, i_batch + 1, total, predict, correct, precision, recall, f_measure))
@@ -393,7 +401,8 @@ def train_argument_extraction(
                 trigger_repr_model.train()
                 aem.train()
         if (i_epoch + 1) == record_save_epoch:
-            record.save('record.pk')
+            record.save(record_name + '_record.pk')
+            print(record.summarize())
         # Save models
         # print('epoch--' + str(i_epoch + 1))
         if (i_epoch + 1) % epoch_save_freq == 0 and (i_epoch + 1) >= save_start_epoch:
@@ -413,7 +422,8 @@ def train_regular_model(lr=None,
                         val_inputs=None,
                         val_labels=None,
                         loss_function=None,
-                        recorder=None):
+                        recorder=None,
+                        save_name=None):
     """
     a regular train proccess
     :param lr:
@@ -432,9 +442,11 @@ def train_regular_model(lr=None,
     """
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model.to(device)
+    max_f = 0.0
     optimizer = AdamW(model.parameters(), lr=lr)
     for i_epoch in range(epoch):
         model.train()
+        epoch_total_loss = 0.0
         for i_batch, batch_ in enumerate(train_inputs):
             label = train_labels[i_batch]
             model.zero_grad()
@@ -442,7 +454,10 @@ def train_regular_model(lr=None,
             loss = loss_function(**output, **label)
             loss.backward()
             optimizer.step()
-
+            epoch_total_loss += loss.float()
+            if (i_batch + 1) % 20 == 0:
+                print(
+                f'epoch:{i_epoch + 1} batch:{i_batch + 1} loss:{loss.float()} epoch_avg_loss:{epoch_total_loss / (i_batch + 1)}')
             # evaluate
             if (i_batch + 1) % eval_freq == 0:
                 model.eval()
@@ -451,13 +466,20 @@ def train_regular_model(lr=None,
                     val_output = model(**val_input)
                     val_outputs.append(recorder.logits2span(**val_output))
                 # todo convert output tensor to spans or tags
-                recorder.record(val_outputs)
-                info_str = recorder.evaluate()
+                recorder.record(val_outputs, i_epoch, i_batch)
+                (p, r, f), info_str = recorder.evaluate()
+                # todo 在train_regular里面加入这个保存最大f的模型并不好。这段代码也没有仔细设计，解耦合不够好
+                if f > max_f:
+                    max_f = f
+                    print(f'New Highest f1:{f}, saving model...')
+                    torch.save(model, save_name)
                 print(info_str)
                 model.train()
         if (i_epoch + 1) % save_freq == 0:
             # save models
-            pass
+            model.eval()
+            torch.save(model, save_name)
+            model.train()
 
 
 if __name__ == '__main__':
