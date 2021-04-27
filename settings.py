@@ -77,39 +77,11 @@ digits_regex = r'(不)?(低于|超过|超)?\d+(\.\d+)?(万|亿)?(股)?'
 date_regex = r'((\d+|今|去|前)\s?年底?)?(\d+月份?)?(\d+日)?'
 
 # Model
-segment_feature = True
-segment_feature_cnt = 1 # 标记开始与非开始 assert token[0]为开始 非CLS
-
-postag_feature = True
-postag_feature_cnt = 29
-
-ner_feature = True
-ner_feature_cnt = 13 # B,I,E,S for Nh, Ni, Ns. And O
-
-parse_feature = False   # todo 依存与语义角色特征还没想好如何加入.
-parse_feature_cnt = 0
-
-role_feature = False
-role_feature_cnt = 0
-
-regex_proportion_feature = True
-regex_proportion_feature_cnt = 1
-
-ltp_feature = True
-ltp_feature_cnt = (segment_feature_cnt if segment_feature else 0) + \
-                  (postag_feature_cnt if postag_feature else 0) + \
-                  (ner_feature_cnt if ner_feature else 0) + \
-                  (parse_feature_cnt if parse_feature else 0) + \
-                  (role_feature_cnt if role_feature else 0) + \
-                  (regex_proportion_feature_cnt if regex_proportion_feature else 0)
-ltp_feature_cnt_fixed = ltp_feature_cnt + 2 # todo pos与ner分别加入两个占位符
-
 pos_tags = ['a', 'b', 'c', 'd', 'e', 'g', 'h', 'i', 'j', 'k', 'm', 'n', 'nd', 'nh', 'ni', 'nl', 'ns', 'nt', 'nz', 'o',
             'p', 'q', 'r', 'u', 'v', 'wp', 'ws', 'x', 'z']
-
 pos_tags_index = {i: x for (i, x) in enumerate(pos_tags)}
 
-ner_tags = [
+old_ner_tags = [
     'B-Nh',
     'B-Ni',
     'B-Ns',
@@ -271,7 +243,48 @@ sdpGraph_tags = [
 ]
 sdpGraph_tags_index = {i: x for (i, x) in enumerate(sdpGraph_tags)}
 
+segment_feature = False
+segment_feature_cnt = 1 # 标记开始与非开始 assert token[0]为开始 非CLS
 
+postag_feature = True
+postag_feature_cnt = len(pos_tags) + 1
+
+ner_feature = True
+ner_feature_cnt = len(ner_tags) + 1
+
+srl_head_feature = True
+srl_head_feature_cnt = len(srl_heads) + 1 # should be 2
+srl_role_feature = True
+srl_role_feature_cnt = len(srl_tags) + 1
+
+dep_sub_feature = True
+dep_sub_feature_cnt = len(dep_tags) + 1
+dep_obj_feature = True
+dep_obj_feature_cnt = dep_sub_feature_cnt
+
+sdptree_sub_feature = True
+sdptree_sub_feature_cnt = len(sdpTree_tags) + 1
+sdptree_obj_feature = True
+sdptree_obj_feature_cnt = sdptree_sub_feature_cnt
+
+regex_proportion_feature = False
+regex_proportion_feature_cnt = 1
+
+ltp_feature = True
+ltp_feature_cnt = (segment_feature_cnt if segment_feature else 0) + \
+                  (postag_feature_cnt if postag_feature else 0) + \
+                  (ner_feature_cnt if ner_feature else 0) + \
+                  (srl_head_feature_cnt if srl_head_feature else 0) + \
+                  (srl_role_feature_cnt if srl_role_feature else 0) + \
+                  (dep_sub_feature_cnt if dep_sub_feature else 0) + \
+                  (dep_obj_feature_cnt if dep_obj_feature else 0) + \
+                  (sdptree_sub_feature_cnt if sdptree_sub_feature else 0) + \
+                  (sdptree_obj_feature_cnt if sdptree_obj_feature else 0) + \
+                  (regex_proportion_feature_cnt if regex_proportion_feature else 0)
+ltp_feature_cnt_fixed = ltp_feature_cnt
+
+
+# self atten
 n_head = 6
 d_head = 1024
 
