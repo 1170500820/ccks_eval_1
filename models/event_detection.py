@@ -17,7 +17,7 @@ class EventDetection(nn.Module):
         self.init_weights()
 
     def init_weights(self):
-        torch.nn.init.xavier_uniform(self.classifier.weight)
+        torch.nn.init.xavier_uniform_(self.classifier.weight)
         self.classifier.bias.data.fill_(0.01)
 
     def forward(self, input_ids=None, token_type_ids=None, attention_mask=None):

@@ -26,9 +26,9 @@ class SelfAttn(nn.Module):
         self.init_weights()
 
     def init_weights(self):
-        torch.nn.init.xavier_uniform(self.q_net.weight)
-        torch.nn.init.xavier_uniform(self.kv_net.weight)
-        torch.nn.init.xavier_uniform(self.o_net.weight)
+        torch.nn.init.xavier_uniform_(self.q_net.weight)
+        torch.nn.init.xavier_uniform_(self.kv_net.weight)
+        torch.nn.init.xavier_uniform_(self.o_net.weight)
 
     def forward(self, embeds):
         """
