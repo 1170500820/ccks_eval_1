@@ -14,7 +14,7 @@ import pickle
 import json
 from tqdm import tqdm
 import torch
-from settings import ner_tags, pos_tags, percentage_regex
+from settings import ner_tags, pos_tags, percentage_regex, srl_heads, srl_tags, dep_tags, sdpTree_tags
 import re
 from tqdm import tqdm
 
@@ -256,13 +256,16 @@ def generate_ner_features(nertags, sent_seg_matches, matches):
 def tags2feature(tags: [str, ], sent_seg_matches, matches, tag_list):
     """
     token_l为该句子tokenize后去除CLS与SEP后的长度
-    len(tag_list)为所有该类型tag的个数
+    len(tag_set)为所有该类型tag的个数
     因为存在未知tag，所以未知tag统一被映射到最后一位 表示
-    因此生成的矩阵(token_l, len(tag_list) + 1)
+    因此生成的矩阵(token_l, len(tag_set) + 1)
     每个列向量是对应token的独热类型表示
 
     整个过程是segment -> char -> tokens
     可以分两步进行
+
+    len(tag_set) + 1 >= 2
+    确保了不需要unsqueeze
     :param tags: 该句子与分词结果所对应的tag列表:len(tag) == len(segmented)
     :param sent_seg_matches: 该句子的分词与字符的对应dict
     :param matches: 该句子的字符与token的对应dict
@@ -271,9 +274,10 @@ def tags2feature(tags: [str, ], sent_seg_matches, matches, tag_list):
     """
     segment2sentence, sentence2segment = sent_seg_matches
     token2origin, origin2token = matches
+    # 先生成一个(token_l, len(tag_set) + 1)的全0矩阵，等待填充1(独热表示)
     matrix = torch.zeros(len(token2origin) - 2, len(tag_list) + 1, dtype=torch.float)
 
-    # 先转化为char的tag list
+    # char的tag list
     char_tag_list = ['UNK'] * len(sentence2segment)
     for i, tag in enumerate(tags):
         for idx in segment2sentence[i]:
@@ -346,7 +350,7 @@ def dep2tag(dep_elem, segment_l):
     assert len(dep_elem) == segment_l, 'ltp一定会处理成长度相等'
     sub_tags, obj_tags = ['UNK'] * segment_l, ['UNK'] * segment_l
     for i, elem in enumerate(dep_elem):
-        sub_tags[i] = elem[0]
+        sub_tags[i] = elem[2]
         if elem[1] != 0:
             obj_tags[elem[1] - 1] = elem[2]
     return sub_tags, obj_tags
@@ -377,29 +381,41 @@ def generate_regex_feature(data, regex_str, matches):
 
 
 if __name__ == '__main__':
-    segmented, pos, ner, srl, dep, sdp_tree, sdp_graph, sent_seg_matches = new_generate_ltp_results()
-    data, segmented, posed, nered, arcs = generate_ltp_results()
+    # segmented, pos, ner, srl, dep, sdp_tree, sdp_graph, sent_seg_matches = new_generate_ltp_results()
+    # Step 1
+    # Load ltp results
+    segmented, pos, ner, srl, dep, sdp_tree, sdp_graph, sent_seg_matches = pickle.load(open('new_ltp_results.pk', 'rb'))
     matches = pickle.load(open('matches.pk', 'rb'))
-    segment_features = generate_segment_feature(data, segmented, matches)
-    sentence_segment_matches = sentence_segment_match(data, segmented)
-    postag_features = generate_postag_feature(posed, sentence_segment_matches, matches)
-    ner_features = generate_ner_features(nered, sentence_segment_matches, matches)
-    regex_proportion_features = generate_regex_feature(data, percentage_regex, matches)
 
-    # tensorize
-    feature_tensors = []
-    segment_feature_tensors, postag_feature_tensors, ner_feature_tensors = [], [], []
-    regex_proportion_tensors = []
-    syntactic_combined = []
-    for i, seg in enumerate(segment_features):
-        pos, ner, reg_prop = postag_features[i], ner_features[i], regex_proportion_features[i]
-        # 只含一层的特征需要unsqueeze, 否则会变成 (seq_l)
-        syntactic_combined.append(torch.tensor(seg, dtype=torch.float).unsqueeze(dim=1))    # (seq_l, 1)
-        syntactic_combined.append(torch.tensor(pos, dtype=torch.float))
-        syntactic_combined.append(torch.tensor(ner, dtype=torch.float))
-        syntactic_combined.append(torch.tensor(reg_prop, dtype=torch.float).unsqueeze(dim=1))
-        feature_tensors.append(torch.cat(syntactic_combined, dim=1))    # (seq_l, syntactic_size)
-        syntactic_combined = []
-    pickle.dump(feature_tensors, open('syntactic_feature_tensors.pk', 'wb'))
+    # Step 2
+    # Generate tag sequences
+    pos_tag_seq = list(map(lambda x: pos2tag(x), pos))
+    ner_tag_seq = list(map(lambda x: ner2tag(x[1], len(segmented[x[0]])), enumerate(ner)))
+    srl_tag_head_n_roles = list(map(lambda x: srl2tag(x[1], len(segmented[x[0]])), enumerate(srl)))
+    dep_tag_sub_n_obj = list(map(lambda x: dep2tag(x[1], len(segmented[x[0]])), enumerate(dep)))
+    sdptree_tag_sub_n_obj = list(map(lambda x: dep2tag(x[1], len(segmented[x[0]])), enumerate(sdp_tree)))
+
+    # Step 3
+    # Generate one-hot tensor for each type of tag sequences
+    syntactic_tensors = []
+    for i, pos_seq in enumerate(pos_tag_seq):
+        cur_sent_seg_match = sent_seg_matches[i]
+        cur_match = matches[i]
+        # find seq
+        ner_seq = ner_tag_seq[i]
+        srl_head_seq, srl_role_seq = srl_tag_head_n_roles[i]
+        dep_sub_seq, dep_obj_seq = dep_tag_sub_n_obj[i]
+        sdptree_sub_seq, sdptree_obj_seq = sdptree_tag_sub_n_obj[i]
+        # generate tensors and concatenate
+        pos_tensor = tags2feature(pos_seq, cur_sent_seg_match, cur_match, pos_tags) # (token_l, len(pos_tag_set) + 1)
+        ner_tensor = tags2feature(ner_seq, cur_sent_seg_match, cur_match, ner_tags) # (token_l, len(ner_tag_set) + 1)
+        srl_head_tensor = tags2feature(srl_head_seq, cur_sent_seg_match, cur_match, srl_heads)  # (token_l, len(srl_head_tag_set) + 1)
+        srl_role_tensor = tags2feature(srl_role_seq, cur_sent_seg_match, cur_match, srl_tags)   # (token_l, len(srl_tag_set) + 1)
+        dep_sub_tensor = tags2feature(dep_sub_seq, cur_sent_seg_match, cur_match, dep_tags) # (token_l, len(dep_tag_set) + 1)
+        dep_obj_tensor = tags2feature(dep_obj_seq, cur_sent_seg_match, cur_match, dep_tags) # (token_l, len(dep_tag_set) + 1)
+        sdptree_sub_tensor = tags2feature(sdptree_sub_seq, cur_sent_seg_match, cur_match, sdpTree_tags) # (token_l, len(sdptree_tag_set) + 1)
+        sdptree_obj_tensor = tags2feature(sdptree_obj_seq, cur_sent_seg_match, cur_match, sdpTree_tags) # (token_l, len(sdptree_tag_set) + 1)
+        syntactic_tensor = torch.cat([pos_tensor, ner_tensor, srl_head_tensor, srl_role_tensor, dep_sub_tensor, dep_obj_tensor, sdptree_sub_tensor, sdptree_obj_tensor], dim=1)
+        syntactic_tensors.append(syntactic_tensor)
+    pickle.dump(syntactic_tensors, open('syntactic_feature_tensors.pk', 'wb'))
     # 剩下只需要stack到embedding当中去即可
-    # 如果需要truncation咋办？
