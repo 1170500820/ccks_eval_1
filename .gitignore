@@ -3,3 +3,4 @@ val_data_for_trigger_extraction.pk
 preprocess/train_data_for_mlm.pk
 train_data_for_argument_extraction.pk
 val_data_for_argument_extraction.pk
+preprocess/syntactic_feature_tensors.pk
