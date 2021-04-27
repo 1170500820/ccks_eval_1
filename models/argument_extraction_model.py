@@ -3,13 +3,14 @@ import torch.nn as nn
 import torch.nn.functional as F
 import pickle
 from .self_attentions import SelfAttn
-from settings import role_types
+from settings import role_types, ltp_embedding_dim
 from models.sentence_representation_layer import SentenceRepresentation, TriggeredSentenceRepresentation
 from models.role_mask import RoleMask
+from models.syntactic_embedding import SyntacticEmbedding
 
 
 class ArgumentExtractionModel(nn.Module):
-    def __init__(self, n_head, hidden_size, d_head, dropout_prob, syntactic_size, skip_attn=False, skip_syn=False, skip_RPE=False, add_lstm=True):
+    def __init__(self, n_head, hidden_size, d_head, dropout_prob, skip_attn=False, skip_syn=False, skip_RPE=False, add_lstm=True):
         """
 
         :param n_head:
@@ -26,15 +27,13 @@ class ArgumentExtractionModel(nn.Module):
         self.hidden_size = hidden_size
         self.d_head = d_head
         self.dropout_prob = dropout_prob
-        self.syntactic_size = syntactic_size
         self.skip_attn = skip_attn
         self.skip_syn = skip_syn
         self.skip_RPE = skip_RPE
         self.add_lstm = add_lstm
 
         self.self_attn = SelfAttn(self.n_head, self.d_head, self.hidden_size, self.dropout_prob)
-
-        self.syntactic_embed = nn.Linear(self.syntactic_size, self.syntactic_size, bias=False)
+        self.syntactic_embed = SyntacticEmbedding()
 
         if add_lstm:
             # FCN for trigger finding
@@ -43,20 +42,19 @@ class ArgumentExtractionModel(nn.Module):
             self.fcn_end = nn.Linear(self.hidden_size , len(role_types))
 
             # try to add a bi-LSTM layer
-            self.lstm = nn.LSTM(self.hidden_size * 2 + self.syntactic_size + 1, self.hidden_size//2,
+            self.lstm = nn.LSTM(self.hidden_size * 2 + ltp_embedding_dim + 1, self.hidden_size//2,
                                 batch_first=True, dropout=self.dropout_prob, bidirectional=True)
         else:
             # FCN for trigger finding
             # origin + attn(origin) + syntactic + RPE
-            self.fcn_start = nn.Linear(self.hidden_size * 2 + self.syntactic_size + 1, len(role_types))
-            self.fcn_end = nn.Linear(self.hidden_size * 2 + self.syntactic_size + 1, len(role_types))
+            self.fcn_start = nn.Linear(self.hidden_size * 2 + ltp_embedding_dim + 1, len(role_types))
+            self.fcn_end = nn.Linear(self.hidden_size * 2 + ltp_embedding_dim + 1, len(role_types))
 
         self.init_weights()
 
     def init_weights(self):
-        torch.nn.init.xavier_uniform(self.fcn_start.weight)
-        torch.nn.init.xavier_uniform(self.fcn_end.weight)
-        torch.nn.init.xavier_uniform(self.syntactic_embed.weight)
+        torch.nn.init.xavier_uniform_(self.fcn_start.weight)
+        torch.nn.init.xavier_uniform_(self.fcn_end.weight)
         self.fcn_start.bias.data.fill_(0)
         self.fcn_end.bias.data.fill_(0)
 
@@ -70,22 +68,22 @@ class ArgumentExtractionModel(nn.Module):
         """
         # self attention (multihead attention)
         attn_out = self.self_attn(cln_embeds)
-        syntactic_structure = self.syntactic_embed(syntactic_structure)
+        syn_embed = self.syntactic_embed(syntactic_structure)
         # concatenation
         if self.skip_attn:
             attn_out = torch.zeros(attn_out.size()).cuda()
         if self.skip_syn:
-            syntactic_structure = torch.zeros(syntactic_structure.size()).cuda()
+            syn_embed = torch.zeros(syn_embed.size()).cuda()
         if self.skip_RPE:
             relative_positional_encoding = torch.zeros(relative_positional_encoding.size()).cuda()
-        final_repr = torch.cat((cln_embeds, attn_out, syntactic_structure, relative_positional_encoding), dim=-1)
+        final_repr = torch.cat((cln_embeds, attn_out, syn_embed, relative_positional_encoding), dim=-1)
 
         if self.add_lstm:
             lstm_repr, (_, __) = self.lstm(final_repr)
             final_repr = lstm_repr
 
         start_logits, end_logits = self.fcn_start(final_repr), self.fcn_end(final_repr) # (bsz, seq_l, len(role_types))
-        starts, ends = F.sigmoid(start_logits), F.sigmoid(end_logits)   # (bsz, seq_l, len(role_types))
+        starts, ends = torch.sigmoid(start_logits), torch.sigmoid(end_logits)   # (bsz, seq_l, len(role_types))
         return starts, ends
 
 
