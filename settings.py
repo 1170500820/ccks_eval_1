@@ -248,24 +248,33 @@ segment_feature_cnt = 1 # 标记开始与非开始 assert token[0]为开始 非C
 
 postag_feature = True
 postag_feature_cnt = len(pos_tags) + 1
+postag_embedding_dim = 10
+
 
 ner_feature = True
 ner_feature_cnt = len(ner_tags) + 1
+ner_embedding_dim = 10
 
 srl_head_feature = True
 srl_head_feature_cnt = len(srl_heads) + 1 # should be 2
+srl_head_embedding_dim = 5
 srl_role_feature = True
 srl_role_feature_cnt = len(srl_tags) + 1
+srl_role_embedding_dim = 10
 
 dep_sub_feature = True
 dep_sub_feature_cnt = len(dep_tags) + 1
+dep_sub_embedding_dim = 10
 dep_obj_feature = True
 dep_obj_feature_cnt = dep_sub_feature_cnt
+dep_obj_embedding_dim = 10
 
 sdptree_sub_feature = True
 sdptree_sub_feature_cnt = len(sdpTree_tags) + 1
+sdptree_sub_embedding_dim = 10
 sdptree_obj_feature = True
 sdptree_obj_feature_cnt = sdptree_sub_feature_cnt
+sdptree_obj_embedding_dim = 10
 
 regex_proportion_feature = False
 regex_proportion_feature_cnt = 1
@@ -282,6 +291,14 @@ ltp_feature_cnt = (segment_feature_cnt if segment_feature else 0) + \
                   (sdptree_obj_feature_cnt if sdptree_obj_feature else 0) + \
                   (regex_proportion_feature_cnt if regex_proportion_feature else 0)
 ltp_feature_cnt_fixed = ltp_feature_cnt
+ltp_embedding_dim = (postag_embedding_dim if postag_feature else 0) + \
+                  (ner_embedding_dim if ner_feature else 0) + \
+                  (srl_head_embedding_dim if srl_head_feature else 0) + \
+                  (srl_role_embedding_dim if srl_role_feature else 0) + \
+                  (dep_sub_embedding_dim if dep_sub_feature else 0) + \
+                  (dep_obj_embedding_dim if dep_obj_feature else 0) + \
+                  (sdptree_sub_embedding_dim if sdptree_sub_feature else 0) + \
+                  (sdptree_obj_embedding_dim if sdptree_obj_feature else 0)
 
 
 # self atten
